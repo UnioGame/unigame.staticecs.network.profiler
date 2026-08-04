@@ -2,46 +2,45 @@ namespace UniGame.StaticEcs.Network.Profiler
 {
     using Unity.Profiling;
 
-    /// <summary>Projects privacy-safe session events into Unity Profiler markers and process-wide delta counters.</summary>
-    public sealed class ProfilerObserver : ISessionObserver
+    /// <summary>Projects privacy-safe network trace events into Unity Profiler markers and counters.</summary>
+    public sealed class ProfilerObserver : INetworkObserver
     {
-        private const string StepMetadata = "Step";
-        private const string TickMetadata = "Tick";
+        private const string DurationMetadata = "DurationNs";
+        private const string ServerTickMetadata = "ServerTick";
         private const string SourceMetadata = "Source";
 
-        private static readonly ProfilerMarker<ulong, uint, uint> StepMarker = Marker("SECS.Net.Step");
-        private static readonly ProfilerMarker<ulong, uint, uint> ReceiveMarker = Marker("SECS.Net.Receive");
-        private static readonly ProfilerMarker<ulong, uint, uint> DecodeMarker = Marker("SECS.Net.Decode");
-        private static readonly ProfilerMarker<ulong, uint, uint> DispatchMarker = Marker("SECS.Net.Dispatch");
-        private static readonly ProfilerMarker<ulong, uint, uint> CaptureMarker = Marker("SECS.Net.Capture");
-        private static readonly ProfilerMarker<ulong, uint, uint> ApplyMarker = Marker("SECS.Net.Apply");
-        private static readonly ProfilerMarker<ulong, uint, uint> EncodeMarker = Marker("SECS.Net.Encode");
-        private static readonly ProfilerMarker<ulong, uint, uint> SendMarker = Marker("SECS.Net.Send");
+        private static readonly ProfilerMarker<long, uint, uint> ReceiveMarker = Marker("SECS.Net.Receive");
+        private static readonly ProfilerMarker<long, uint, uint> DecodeMarker = Marker("SECS.Net.Decode");
+        private static readonly ProfilerMarker<long, uint, uint> CommandDispatchMarker = Marker("SECS.Net.CommandDispatch");
+        private static readonly ProfilerMarker<long, uint, uint> SnapshotApplyMarker = Marker("SECS.Net.SnapshotApply");
+        private static readonly ProfilerMarker<long, uint, uint> SnapshotCaptureMarker = Marker("SECS.Net.SnapshotCapture");
+        private static readonly ProfilerMarker<long, uint, uint> SendMarker = Marker("SECS.Net.Send");
 
-        private static readonly ProfilerCounter<long> WireInCounter =
-            Counter<long>("SECS.Net.WireIn", ProfilerMarkerDataUnit.Bytes);
-        private static readonly ProfilerCounter<long> WireOutCounter =
-            Counter<long>("SECS.Net.WireOut", ProfilerMarkerDataUnit.Bytes);
-        private static readonly ProfilerCounter<long> DecodedCounter =
-            Counter<long>("SECS.Net.Decoded", ProfilerMarkerDataUnit.Bytes);
-        private static readonly ProfilerCounter<int> CommandsCounter =
-            Counter<int>("SECS.Net.Commands", ProfilerMarkerDataUnit.Count);
-        private static readonly ProfilerCounter<int> CapturesCounter =
-            Counter<int>("SECS.Net.Captures", ProfilerMarkerDataUnit.Count);
-        private static readonly ProfilerCounter<int> AppliesCounter =
-            Counter<int>("SECS.Net.Applies", ProfilerMarkerDataUnit.Count);
-        private static readonly ProfilerCounter<int> RetriesCounter =
-            Counter<int>("SECS.Net.Retries", ProfilerMarkerDataUnit.Count);
-        private static readonly ProfilerCounter<int> DeclinesCounter =
-            Counter<int>("SECS.Net.Declines", ProfilerMarkerDataUnit.Count);
-        private static readonly ProfilerCounter<int> FaultsCounter =
-            Counter<int>("SECS.Net.Faults", ProfilerMarkerDataUnit.Count);
-        private static readonly ProfilerCounter<int> ResyncsCounter =
-            Counter<int>("SECS.Net.Resyncs", ProfilerMarkerDataUnit.Count);
+        private static readonly ProfilerCounter<long> ReceiveDurationCounter = Duration("Receive");
+        private static readonly ProfilerCounter<long> DecodeDurationCounter = Duration("Decode");
+        private static readonly ProfilerCounter<long> CommandDispatchDurationCounter = Duration("CommandDispatch");
+        private static readonly ProfilerCounter<long> SnapshotApplyDurationCounter = Duration("SnapshotApply");
+        private static readonly ProfilerCounter<long> SnapshotCaptureDurationCounter = Duration("SnapshotCapture");
+        private static readonly ProfilerCounter<long> SendDurationCounter = Duration("Send");
 
-        static ProfilerObserver()
-        {
-        }
+        private static readonly ProfilerCounter<long> BytesInCounter = Counter<long>("SECS.Net.BytesIn", ProfilerMarkerDataUnit.Bytes);
+        private static readonly ProfilerCounter<long> BytesOutCounter = Counter<long>("SECS.Net.BytesOut", ProfilerMarkerDataUnit.Bytes);
+        private static readonly ProfilerCounter<int> PacketsInCounter = Counter<int>("SECS.Net.PacketsIn", ProfilerMarkerDataUnit.Count);
+        private static readonly ProfilerCounter<int> PacketsOutCounter = Counter<int>("SECS.Net.PacketsOut", ProfilerMarkerDataUnit.Count);
+        private static readonly ProfilerCounter<int> RejectedCommandsCounter = Counter<int>("SECS.Net.RejectedCommands", ProfilerMarkerDataUnit.Count);
+        private static readonly ProfilerCounter<int> ResyncsCounter = Counter<int>("SECS.Net.Resyncs", ProfilerMarkerDataUnit.Count);
+        private static readonly ProfilerCounter<int> ProtocolErrorsCounter = Counter<int>("SECS.Net.ProtocolErrors", ProfilerMarkerDataUnit.Count);
+        private static readonly ProfilerCounter<int> SchemaErrorsCounter = Counter<int>("SECS.Net.SchemaErrors", ProfilerMarkerDataUnit.Count);
+
+        private static ProfilerCounterValue<int> ActiveConnectionsCounter = Gauge<int>("SECS.Net.ActiveConnections", ProfilerMarkerDataUnit.Count);
+        private static ProfilerCounterValue<int> ActivePeersCounter = Gauge<int>("SECS.Net.ActivePeers", ProfilerMarkerDataUnit.Count);
+        private static ProfilerCounterValue<int> CommandQueueCounter = Gauge<int>("SECS.Net.CommandQueue", ProfilerMarkerDataUnit.Count);
+        private static ProfilerCounterValue<int> SnapshotBytesCounter = Gauge<int>("SECS.Net.SnapshotBytes", ProfilerMarkerDataUnit.Bytes);
+        private static ProfilerCounterValue<int> SnapshotEntitiesCounter = Gauge<int>("SECS.Net.SnapshotEntities", ProfilerMarkerDataUnit.Count);
+        private static ProfilerCounterValue<int> SnapshotRecordsCounter = Gauge<int>("SECS.Net.SnapshotRecords", ProfilerMarkerDataUnit.Count);
+        private static ProfilerCounterValue<int> HistoryTicksCounter = Gauge<int>("SECS.Net.HistoryTicks", ProfilerMarkerDataUnit.Count);
+        private static ProfilerCounterValue<long> HistoryBytesCounter = Gauge<long>("SECS.Net.HistoryBytes", ProfilerMarkerDataUnit.Bytes);
+        private static ProfilerCounterValue<int> ClientServerTickGapCounter = Gauge<int>("SECS.Net.ClientServerTickGap", ProfilerMarkerDataUnit.Count);
 
         /// <summary>Creates an observer for a caller-selected privacy-safe numeric source lane.</summary>
         public ProfilerObserver(uint source = 0)
@@ -52,83 +51,143 @@ namespace UniGame.StaticEcs.Network.Profiler
         /// <summary>Gets the caller-selected privacy-safe numeric source lane.</summary>
         public uint Source { get; }
 
-        /// <summary>Projects one session event into matching profiler markers and positive delta counters.</summary>
-        public void Observe(in SessionEvent value)
+        /// <summary>Projects one immutable network trace event into Unity Profiler telemetry.</summary>
+        public void Observe(in NetworkTraceEvent value)
         {
-            if (value.Phase == SessionEventPhase.Begin)
+            if (value.Kind == NetworkTraceKind.Begin)
             {
                 Begin(in value);
                 return;
             }
 
-            if (value.Phase == SessionEventPhase.End)
+            if (value.Kind == NetworkTraceKind.End)
             {
-                End(in value);
+                End(value.Phase);
+            }
+            else if (value.Kind == NetworkTraceKind.Point)
+            {
+                Begin(in value);
+                End(value.Phase);
+            }
+            else
+            {
                 return;
             }
 
-            if (value.Phase != SessionEventPhase.Point)
-                return;
-
-            if (value.Kind == SessionEventKind.Fault)
-                FaultsCounter.Sample(1);
-            else if (value.Kind == SessionEventKind.Resync)
-                ResyncsCounter.Sample(1);
+            Sample(in value);
         }
 
-        private static ProfilerMarker<ulong, uint, uint> Marker(string name) =>
-            new(ProfilerCategory.Network, name, StepMetadata, TickMetadata, SourceMetadata);
-
-        private static ProfilerCounter<T> Counter<T>(string name, ProfilerMarkerDataUnit unit)
-            where T : unmanaged => new(ProfilerCategory.Network, name, unit);
-
-        private void Begin(in SessionEvent value)
+        private static ProfilerMarker<long, uint, uint> Marker(string name)
         {
-            switch (value.Kind)
+            return new ProfilerMarker<long, uint, uint>(ProfilerCategory.Network, name,
+                DurationMetadata, ServerTickMetadata, SourceMetadata);
+        }
+
+        private static ProfilerCounter<long> Duration(string phase)
+        {
+            return Counter<long>("SECS.Net." + phase + ".Duration", ProfilerMarkerDataUnit.TimeNanoseconds);
+        }
+
+        private static ProfilerCounter<T> Counter<T>(string name, ProfilerMarkerDataUnit unit) where T : unmanaged
+        {
+            return new ProfilerCounter<T>(ProfilerCategory.Network, name, unit);
+        }
+
+        private static ProfilerCounterValue<T> Gauge<T>(string name, ProfilerMarkerDataUnit unit) where T : unmanaged
+        {
+            return new ProfilerCounterValue<T>(ProfilerCategory.Network, name, unit);
+        }
+
+        private void Begin(in NetworkTraceEvent value)
+        {
+            switch (value.Phase)
             {
-                case SessionEventKind.Step: StepMarker.Begin(value.Step, value.Tick, Source); break;
-                case SessionEventKind.Receive: ReceiveMarker.Begin(value.Step, value.Tick, Source); break;
-                case SessionEventKind.Decode: DecodeMarker.Begin(value.Step, value.Tick, Source); break;
-                case SessionEventKind.Dispatch: DispatchMarker.Begin(value.Step, value.Tick, Source); break;
-                case SessionEventKind.Capture: CaptureMarker.Begin(value.Step, value.Tick, Source); break;
-                case SessionEventKind.Apply: ApplyMarker.Begin(value.Step, value.Tick, Source); break;
-                case SessionEventKind.Encode: EncodeMarker.Begin(value.Step, value.Tick, Source); break;
-                case SessionEventKind.Send: SendMarker.Begin(value.Step, value.Tick, Source); break;
+                case NetworkPhase.Receive: ReceiveMarker.Begin(value.DurationNanoseconds, value.ServerTick, Source); break;
+                case NetworkPhase.Decode: DecodeMarker.Begin(value.DurationNanoseconds, value.ServerTick, Source); break;
+                case NetworkPhase.CommandDispatch: CommandDispatchMarker.Begin(value.DurationNanoseconds, value.ServerTick, Source); break;
+                case NetworkPhase.SnapshotApply: SnapshotApplyMarker.Begin(value.DurationNanoseconds, value.ServerTick, Source); break;
+                case NetworkPhase.SnapshotCapture: SnapshotCaptureMarker.Begin(value.DurationNanoseconds, value.ServerTick, Source); break;
+                case NetworkPhase.Send: SendMarker.Begin(value.DurationNanoseconds, value.ServerTick, Source); break;
             }
         }
 
-        private static void End(in SessionEvent value)
+        private static void End(NetworkPhase phase)
         {
-            switch (value.Kind)
+            switch (phase)
             {
-                case SessionEventKind.Step: StepMarker.End(); break;
-                case SessionEventKind.Receive:
-                    ReceiveMarker.End();
-                    if (value.Success && value.WireBytes > 0) WireInCounter.Sample((long)value.WireBytes);
-                    break;
-                case SessionEventKind.Decode:
-                    DecodeMarker.End();
-                    if (value.Success && value.DecodedBytes > 0) DecodedCounter.Sample((long)value.DecodedBytes);
-                    break;
-                case SessionEventKind.Dispatch:
-                    DispatchMarker.End();
-                    if (value.Success && value.Count > 0) CommandsCounter.Sample(value.Count);
-                    break;
-                case SessionEventKind.Capture:
-                    CaptureMarker.End();
-                    if (value.Success) CapturesCounter.Sample(1);
-                    break;
-                case SessionEventKind.Apply:
-                    ApplyMarker.End();
-                    if (value.Success) AppliesCounter.Sample(1);
-                    break;
-                case SessionEventKind.Encode: EncodeMarker.End(); break;
-                case SessionEventKind.Send:
-                    SendMarker.End();
-                    if (value.Success && value.WireBytes > 0) WireOutCounter.Sample((long)value.WireBytes);
-                    if (value.Retry) RetriesCounter.Sample(1);
-                    if (!value.Success) DeclinesCounter.Sample(1);
-                    break;
+                case NetworkPhase.Receive: ReceiveMarker.End(); break;
+                case NetworkPhase.Decode: DecodeMarker.End(); break;
+                case NetworkPhase.CommandDispatch: CommandDispatchMarker.End(); break;
+                case NetworkPhase.SnapshotApply: SnapshotApplyMarker.End(); break;
+                case NetworkPhase.SnapshotCapture: SnapshotCaptureMarker.End(); break;
+                case NetworkPhase.Send: SendMarker.End(); break;
+            }
+        }
+
+        private static void Sample(in NetworkTraceEvent value)
+        {
+            SampleDuration(in value);
+            SampleDeltas(in value);
+            SampleGauges(in value);
+        }
+
+        private static void SampleDuration(in NetworkTraceEvent value)
+        {
+            if (value.DurationNanoseconds <= 0)
+                return;
+
+            switch (value.Phase)
+            {
+                case NetworkPhase.Receive: ReceiveDurationCounter.Sample(value.DurationNanoseconds); break;
+                case NetworkPhase.Decode: DecodeDurationCounter.Sample(value.DurationNanoseconds); break;
+                case NetworkPhase.CommandDispatch: CommandDispatchDurationCounter.Sample(value.DurationNanoseconds); break;
+                case NetworkPhase.SnapshotApply: SnapshotApplyDurationCounter.Sample(value.DurationNanoseconds); break;
+                case NetworkPhase.SnapshotCapture: SnapshotCaptureDurationCounter.Sample(value.DurationNanoseconds); break;
+                case NetworkPhase.Send: SendDurationCounter.Sample(value.DurationNanoseconds); break;
+            }
+        }
+
+        private static void SampleDeltas(in NetworkTraceEvent value)
+        {
+            if (value.Phase == NetworkPhase.Receive && value.Result == NetworkResultCategory.Success)
+            {
+                if (value.Bytes > 0) BytesInCounter.Sample(value.Bytes);
+                if (value.Packets > 0) PacketsInCounter.Sample(value.Packets);
+            }
+
+            if (value.Phase == NetworkPhase.Send && value.Result == NetworkResultCategory.Success)
+            {
+                if (value.Bytes > 0) BytesOutCounter.Sample(value.Bytes);
+                if (value.Packets > 0) PacketsOutCounter.Sample(value.Packets);
+                if (value.PacketKind == NetworkPacketKind.ResyncRequest) ResyncsCounter.Sample(value.Packets > 0 ? value.Packets : 1);
+            }
+
+            if (value.Phase == NetworkPhase.CommandDispatch && value.RejectedCommands > 0)
+                RejectedCommandsCounter.Sample(value.RejectedCommands);
+
+            if (value.Result == NetworkResultCategory.Protocol ||
+                value.Result == NetworkResultCategory.Malformed ||
+                value.Result == NetworkResultCategory.Limits)
+                ProtocolErrorsCounter.Sample(1);
+            else if (value.Result == NetworkResultCategory.Schema)
+                SchemaErrorsCounter.Sample(1);
+        }
+
+        private static void SampleGauges(in NetworkTraceEvent value)
+        {
+            ActiveConnectionsCounter.Value = value.ActiveConnections;
+            ActivePeersCounter.Value = value.ActivePeers;
+            CommandQueueCounter.Value = value.QueueSize;
+            HistoryTicksCounter.Value = value.HistoryTicks;
+            HistoryBytesCounter.Value = value.HistoryBytes;
+            ClientServerTickGapCounter.Value = value.ClientServerTickGap;
+
+            if ((value.Phase == NetworkPhase.SnapshotApply || value.Phase == NetworkPhase.SnapshotCapture) &&
+                value.Result == NetworkResultCategory.Success)
+            {
+                SnapshotBytesCounter.Value = value.Bytes;
+                SnapshotEntitiesCounter.Value = value.Entities;
+                SnapshotRecordsCounter.Value = value.Records;
             }
         }
     }

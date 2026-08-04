@@ -1,14 +1,14 @@
 {
   "name": "com.unigame.staticecs.network.profiler",
   "author": "UniGame",
-  "displayName": "UniGame Static ECS Network Profiler",
-  "description": "Optional Unity Profiler instrumentation for Static ECS network sessions",
+  "displayName": "Static ECS Network Profiler",
+  "description": "Optional Unity Profiler instrumentation for Static ECS network telemetry",
   "unity": "2023.2",
-  "version": "2026.0.1",
+  "version": "2026.1.0",
   "license": "MIT",
   "keywords": ["unigame", "ecs", "network", "profiler"],
   "dependencies": {
-    "com.unigame.staticecs.network": "2026.0.1",
+    "com.unigame.staticecs.network": "2026.1.0",
     "com.unity.profiling.core": "1.0.3"
   }
 }
