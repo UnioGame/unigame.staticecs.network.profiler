@@ -4,6 +4,7 @@
   "references": [
     "unigame.staticecs.network.profiler",
     "unigame.staticecs.network",
+    "unigame.staticecs.network.protocol",
     "Unity.Profiling.Core"
   ],
   "includePlatforms": ["Editor"],
