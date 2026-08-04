@@ -175,12 +175,14 @@ namespace UniGame.StaticEcs.Network.Profiler
 
         private static void SampleGauges(in NetworkTraceEvent value)
         {
-            ActiveConnectionsCounter.Value = value.ActiveConnections;
-            ActivePeersCounter.Value = value.ActivePeers;
-            CommandQueueCounter.Value = value.QueueSize;
-            HistoryTicksCounter.Value = value.HistoryTicks;
-            HistoryBytesCounter.Value = value.HistoryBytes;
-            ClientServerTickGapCounter.Value = value.ClientServerTickGap;
+            if (CarriesServerConnectionGauges(in value))
+            {
+                ActiveConnectionsCounter.Value = value.ActiveConnections;
+                ActivePeersCounter.Value = value.ActivePeers;
+            }
+
+            if (value.Phase == NetworkPhase.CommandDispatch)
+                CommandQueueCounter.Value = value.QueueSize;
 
             if ((value.Phase == NetworkPhase.SnapshotApply || value.Phase == NetworkPhase.SnapshotCapture) &&
                 value.Result == NetworkResultCategory.Success)
@@ -188,6 +190,31 @@ namespace UniGame.StaticEcs.Network.Profiler
                 SnapshotBytesCounter.Value = value.Bytes;
                 SnapshotEntitiesCounter.Value = value.Entities;
                 SnapshotRecordsCounter.Value = value.Records;
+                HistoryTicksCounter.Value = value.HistoryTicks;
+                HistoryBytesCounter.Value = value.HistoryBytes;
+            }
+
+            if ((value.Phase == NetworkPhase.Decode || value.Phase == NetworkPhase.SnapshotApply) &&
+                value.Result == NetworkResultCategory.Success)
+                ClientServerTickGapCounter.Value = value.ClientServerTickGap;
+        }
+
+        private static bool CarriesServerConnectionGauges(in NetworkTraceEvent value)
+        {
+            if (value.Role != NetworkRole.Server)
+                return false;
+
+            switch (value.Phase)
+            {
+                case NetworkPhase.Receive:
+                case NetworkPhase.Decode:
+                case NetworkPhase.CommandDispatch:
+                case NetworkPhase.Send:
+                    return true;
+                case NetworkPhase.SnapshotCapture:
+                    return value.Result == NetworkResultCategory.Success;
+                default:
+                    return false;
             }
         }
     }

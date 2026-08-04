@@ -109,7 +109,12 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             var observer = new ProfilerObserver();
             using var counters = new CounterRecorders();
 
-            var received = Trace(NetworkPhase.Receive, bytes: 120, packets: 2);
+            var received = Trace(
+                NetworkPhase.Receive,
+                bytes: 120,
+                packets: 2,
+                activeConnections: 5,
+                activePeers: 4);
             observer.Observe(in received);
 
             var rejected = Trace(
@@ -135,11 +140,25 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
                 clientServerTickGap: 3);
             observer.Observe(in snapshot);
 
-            var protocolError = Trace(NetworkPhase.Decode, NetworkResultCategory.Protocol);
+            var protocolError = Trace(
+                NetworkPhase.Decode,
+                NetworkResultCategory.Protocol,
+                activeConnections: 5,
+                activePeers: 4);
             observer.Observe(in protocolError);
 
-            var schemaError = Trace(NetworkPhase.Decode, NetworkResultCategory.Schema);
+            var schemaError = Trace(
+                NetworkPhase.Decode,
+                NetworkResultCategory.Schema,
+                activeConnections: 5,
+                activePeers: 4);
             observer.Observe(in schemaError);
+
+            var decoded = Trace(
+                NetworkPhase.Decode,
+                clientServerTickGap: 2,
+                role: NetworkRole.Client);
+            observer.Observe(in decoded);
 
             var sent = Trace(
                 NetworkPhase.Send,
@@ -151,7 +170,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
                 historyBytes: 1000,
                 activeConnections: 4,
                 activePeers: 3,
-                clientServerTickGap: 2);
+                clientServerTickGap: 99);
             observer.Observe(in sent);
 
             yield return null;
@@ -166,13 +185,85 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(counters.SchemaErrors.LastValue, Is.EqualTo(1));
             Assert.That(counters.ActiveConnections.LastValue, Is.EqualTo(4));
             Assert.That(counters.ActivePeers.LastValue, Is.EqualTo(3));
-            Assert.That(counters.CommandQueue.LastValue, Is.EqualTo(1));
+            Assert.That(counters.CommandQueue.LastValue, Is.EqualTo(3));
             Assert.That(counters.SnapshotBytes.LastValue, Is.EqualTo(700));
             Assert.That(counters.SnapshotEntities.LastValue, Is.EqualTo(8));
             Assert.That(counters.SnapshotRecords.LastValue, Is.EqualTo(13));
-            Assert.That(counters.HistoryTicks.LastValue, Is.EqualTo(7));
-            Assert.That(counters.HistoryBytes.LastValue, Is.EqualTo(1000));
+            Assert.That(counters.HistoryTicks.LastValue, Is.EqualTo(6));
+            Assert.That(counters.HistoryBytes.LastValue, Is.EqualTo(900));
             Assert.That(counters.ClientServerTickGap.LastValue, Is.EqualTo(2));
+        }
+
+        [UnityTest]
+        public IEnumerator GaugePlaceholdersDoNotOverwriteAuthoritativeValues()
+        {
+            var observer = new ProfilerObserver();
+            using var counters = new CounterRecorders();
+
+            var dispatch = Trace(
+                NetworkPhase.CommandDispatch,
+                queueSize: 7,
+                activeConnections: 2,
+                activePeers: 2);
+            observer.Observe(in dispatch);
+
+            var capture = Trace(
+                NetworkPhase.SnapshotCapture,
+                bytes: 300,
+                entities: 3,
+                records: 5,
+                historyTicks: 3,
+                historyBytes: 300,
+                activeConnections: 2,
+                activePeers: 2);
+            observer.Observe(in capture);
+
+            var apply = Trace(
+                NetworkPhase.SnapshotApply,
+                bytes: 500,
+                entities: 4,
+                records: 8,
+                historyTicks: 5,
+                historyBytes: 500,
+                clientServerTickGap: 4,
+                role: NetworkRole.Client);
+            observer.Observe(in apply);
+
+            var sendPlaceholder = Trace(NetworkPhase.Send, role: NetworkRole.Client);
+            observer.Observe(in sendPlaceholder);
+            var receivePlaceholder = Trace(NetworkPhase.Receive, role: NetworkRole.Client);
+            observer.Observe(in receivePlaceholder);
+
+            yield return null;
+
+            Assert.That(counters.ActiveConnections.LastValue, Is.EqualTo(2));
+            Assert.That(counters.ActivePeers.LastValue, Is.EqualTo(2));
+            Assert.That(counters.CommandQueue.LastValue, Is.EqualTo(7));
+            Assert.That(counters.SnapshotBytes.LastValue, Is.EqualTo(500));
+            Assert.That(counters.SnapshotEntities.LastValue, Is.EqualTo(4));
+            Assert.That(counters.SnapshotRecords.LastValue, Is.EqualTo(8));
+            Assert.That(counters.HistoryTicks.LastValue, Is.EqualTo(5));
+            Assert.That(counters.HistoryBytes.LastValue, Is.EqualTo(500));
+            Assert.That(counters.ClientServerTickGap.LastValue, Is.EqualTo(4));
+
+            var emptyDispatch = Trace(NetworkPhase.CommandDispatch);
+            observer.Observe(in emptyDispatch);
+            var emptyApply = Trace(NetworkPhase.SnapshotApply, role: NetworkRole.Client);
+            observer.Observe(in emptyApply);
+            var noConnections = Trace(NetworkPhase.Decode);
+            observer.Observe(in noConnections);
+
+            yield return null;
+
+            Assert.That(counters.ActiveConnections.LastValue, Is.EqualTo(0));
+            Assert.That(counters.ActivePeers.LastValue, Is.EqualTo(0));
+            Assert.That(counters.CommandQueue.LastValue, Is.EqualTo(0));
+            Assert.That(counters.SnapshotBytes.LastValue, Is.EqualTo(0));
+            Assert.That(counters.SnapshotEntities.LastValue, Is.EqualTo(0));
+            Assert.That(counters.SnapshotRecords.LastValue, Is.EqualTo(0));
+            Assert.That(counters.HistoryTicks.LastValue, Is.EqualTo(0));
+            Assert.That(counters.HistoryBytes.LastValue, Is.EqualTo(0));
+            Assert.That(counters.ClientServerTickGap.LastValue, Is.EqualTo(0));
         }
 
         [UnityTest]
@@ -210,13 +301,14 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             int clientServerTickGap = 0,
             long durationNanoseconds = 0,
             NetworkPacketKind packetKind = NetworkPacketKind.None,
-            int rejectedCommands = 0)
+            int rejectedCommands = 0,
+            NetworkRole role = NetworkRole.Server)
         {
             return new NetworkTraceEvent(
                 phase,
                 kind,
                 result,
-                NetworkRole.Server,
+                role,
                 1,
                 2,
                 3,
