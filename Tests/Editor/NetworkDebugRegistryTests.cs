@@ -143,15 +143,19 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
         public void ResetClearsRegistryAndRetainedState()
         {
             using var lease = NetworkDebugRegistry.Register("source", "Source", Array.Empty<NetworkSchemaEntry>(),
-                out var source);
+                out var source, traceCapacity: 1);
             source.TraceEnabled = true;
-            var trace = Trace(4);
-            source.Observe(in trace);
+            Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 10, 1));
+            Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 20, 1));
             NetworkDebugRegistry.Reset();
             Assert.That(NetworkDebugRegistry.Sources(), Is.Empty);
             Assert.That(source.Capture().Trace, Is.Empty);
             Assert.That(source.Capture().ReceivedBytes, Is.Zero);
             Assert.That(Traffic(source.Capture(), NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes, Is.Zero);
+            Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 50, 1));
+            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Hello, 5, 1));
+            Assert.That(Traffic(source.Capture(), NetworkTrafficDirection.Receive, NetworkPacketKind.Hello).Bytes,
+                Is.EqualTo(50), "Reset must clear overflow decode tombstones.");
         }
 
         /// <summary>Verifies pending receive deltas are visible under None then move to decoded kind exactly once.</summary>
@@ -214,7 +218,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
 
         /// <summary>Verifies pending FIFO overflow commits oldest None while later decodes retain order.</summary>
         [Test]
-        public void ReceiveFifoOverflowCommitsOldestToNone()
+        public void ReceiveFifoOverflowPreservesRealDecodeAlignment()
         {
             using var lease = Source(2, out var source);
             Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 10, 1));
@@ -223,14 +227,43 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             var overflow = source.Capture();
             Assert.That(Traffic(overflow, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes, Is.EqualTo(60));
             Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Hello, 0, 0));
-            var oneDecoded = source.Capture();
-            Assert.That(Traffic(oneDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes, Is.EqualTo(40));
-            Assert.That(Traffic(oneDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.Hello).Bytes, Is.EqualTo(20));
+            var tombstoneDecoded = source.Capture();
+            Assert.That(Traffic(tombstoneDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes,
+                Is.EqualTo(60));
+            Assert.That(Traffic(tombstoneDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.Hello).Bytes,
+                Is.Zero, "Decode A must consume A's settled-overflow tombstone.");
             Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Ack, 0, 0));
+            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.FullSnapshot, 0, 0));
             var allDecoded = source.Capture();
             Assert.That(Traffic(allDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes, Is.EqualTo(10));
-            Assert.That(Traffic(allDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.Ack).Bytes, Is.EqualTo(30));
+            Assert.That(Traffic(allDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.Ack).Bytes, Is.EqualTo(20));
+            Assert.That(Traffic(allDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.FullSnapshot).Bytes,
+                Is.EqualTo(30));
             Assert.That(allDecoded.ReceivedBytes, Is.EqualTo(60));
+        }
+
+        /// <summary>Verifies multiple overflow tombstones preserve alignment for all later decodes.</summary>
+        [Test]
+        public void MultipleOverflowsPreserveDecodeAlignment()
+        {
+            using var lease = Source(2, out var source);
+            Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 10, 1));
+            Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 20, 1));
+            Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 30, 1));
+            Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 40, 1));
+            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Hello, 1, 1));
+            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Ack, 1, 1));
+            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.FullSnapshot, 1, 1));
+            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Disconnect, 1, 1));
+            var data = source.Capture();
+            Assert.That(data.ReceivedBytes, Is.EqualTo(100));
+            Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes, Is.EqualTo(30));
+            Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.Hello).Bytes, Is.Zero);
+            Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.Ack).Bytes, Is.Zero);
+            Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.FullSnapshot).Bytes,
+                Is.EqualTo(30));
+            Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.Disconnect).Bytes,
+                Is.EqualTo(40));
         }
 
         /// <summary>Verifies send owns both totals and immediate packet-kind attribution.</summary>

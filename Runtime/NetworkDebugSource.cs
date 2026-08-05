@@ -23,6 +23,7 @@ namespace UniGame.StaticEcs.Network.Profiler
         private long _receivedPackets;
         private long _sentPackets;
         private long _errors;
+        private long _receiveDecodeTombstones;
         private bool _hasRole;
         private NetworkRole _role;
         private SchemaFingerprint _fingerprint;
@@ -159,6 +160,7 @@ namespace UniGame.StaticEcs.Network.Profiler
                 Array.Clear(_receivedPacketsByKind, 0, _receivedPacketsByKind.Length);
                 Array.Clear(_sentPacketsByKind, 0, _sentPacketsByKind.Length);
                 _receivedBytes = _sentBytes = _receivedPackets = _sentPackets = _errors = 0;
+                _receiveDecodeTombstones = 0;
                 _hasRole = false;
                 _role = default;
                 _fingerprint = default;
@@ -187,11 +189,21 @@ namespace UniGame.StaticEcs.Network.Profiler
                 _receivedBytes = SaturatingAdd(_receivedBytes, bytes);
                 _receivedPackets = SaturatingAdd(_receivedPackets, packets);
                 if (_pendingReceive.Add(new PendingTraffic(bytes, packets), out var overflow))
+                {
                     CommitReceive(NetworkPacketKind.None, overflow);
+                    _receiveDecodeTombstones = SaturatingAdd(_receiveDecodeTombstones, 1);
+                }
             }
             else if (value.Phase == NetworkPhase.Decode)
             {
-                if (_pendingReceive.TryTake(out var pending)) CommitReceive((NetworkPacketKind)kind, pending);
+                if (_receiveDecodeTombstones > 0)
+                {
+                    _receiveDecodeTombstones--;
+                }
+                else if (_pendingReceive.TryTake(out var pending))
+                {
+                    CommitReceive((NetworkPacketKind)kind, pending);
+                }
             }
             else if (value.Phase == NetworkPhase.Send)
             {
