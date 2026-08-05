@@ -325,7 +325,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
         }
 
         private readonly struct TestWorld : IWorldType { }
-        private readonly struct TestEntity : IEntityType, INetworkType
+        internal readonly struct TestEntity : IEntityType, INetworkType
         {
             /// <summary>Returns the isolated test entity kind.</summary>
             public byte Id() => 1;
