@@ -50,6 +50,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             var schema = factory.Freeze();
             using var lease = NetworkDebugRegistry.Register("source", "Source", schema.Entries, out var source,
                 traceCapacity: 2, historyCapacity: 2, worldName: "Main");
+            source.TraceEnabled = true;
 
             for (var i = 1; i <= 3; i++)
             {
@@ -149,6 +150,110 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             NetworkDebugRegistry.Reset();
             Assert.That(NetworkDebugRegistry.Sources(), Is.Empty);
             Assert.That(source.Capture().Trace, Is.Empty);
+            Assert.That(source.Capture().ReceivedBytes, Is.Zero);
+            Assert.That(Traffic(source.Capture(), NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes, Is.Zero);
+        }
+
+        /// <summary>Verifies pending receive deltas are visible under None then move to decoded kind exactly once.</summary>
+        [Test]
+        public void ReceiveThenDecodeAttributesTransportDeltaWithoutDoubleCounting()
+        {
+            using var lease = Source(4, out var source);
+            var receive = TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 300, 1);
+            source.Observe(in receive);
+            var pending = source.Capture();
+            Assert.That(pending.ReceivedBytes, Is.EqualTo(300));
+            Assert.That(Traffic(pending, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes, Is.EqualTo(300));
+            var repeatedPending = source.Capture();
+            Assert.That(repeatedPending.ReceivedBytes, Is.EqualTo(300));
+            Assert.That(Traffic(repeatedPending, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes,
+                Is.EqualTo(300), "Capture must not commit or duplicate a pending delta.");
+
+            var decode = TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.FullSnapshot, 120, 9);
+            source.Observe(in decode);
+            var decoded = source.Capture();
+            Assert.That(decoded.ReceivedBytes, Is.EqualTo(300), "Decode bytes must not increment transport totals.");
+            Assert.That(decoded.ReceivedPackets, Is.EqualTo(1));
+            Assert.That(Traffic(decoded, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes, Is.Zero);
+            Assert.That(Traffic(decoded, NetworkTrafficDirection.Receive, NetworkPacketKind.FullSnapshot).Bytes, Is.EqualTo(300));
+            Assert.That(Traffic(decoded, NetworkTrafficDirection.Receive, NetworkPacketKind.FullSnapshot).Packets, Is.EqualTo(1));
+        }
+
+        /// <summary>Verifies ordered decodes consume differently sized receives from FIFO oldest-first.</summary>
+        [Test]
+        public void SeveralReceivesAreAttributedInDecodeOrder()
+        {
+            using var lease = Source(4, out var source);
+            Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 10, 1));
+            Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 20, 2));
+            Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 30, 3));
+            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Hello, 1000, 99));
+            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Ack, 1000, 99));
+            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.FullSnapshot, 1000, 99));
+            var data = source.Capture();
+            Assert.That(data.ReceivedBytes, Is.EqualTo(60));
+            Assert.That(data.ReceivedPackets, Is.EqualTo(6));
+            Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.Hello).Bytes, Is.EqualTo(10));
+            Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.Ack).Bytes, Is.EqualTo(20));
+            Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.FullSnapshot).Bytes, Is.EqualTo(30));
+        }
+
+        /// <summary>Verifies malformed Decode(None) consumes and commits the retained transport delta to None.</summary>
+        [Test]
+        public void MalformedDecodeCommitsOldestReceiveToNone()
+        {
+            using var lease = Source(4, out var source);
+            Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 40, 2));
+            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.None, 3, 1,
+                NetworkResultCategory.Malformed));
+            var data = source.Capture();
+            Assert.That(data.ReceivedBytes, Is.EqualTo(40));
+            Assert.That(data.Errors, Is.EqualTo(1));
+            Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes, Is.EqualTo(40));
+        }
+
+        /// <summary>Verifies pending FIFO overflow commits oldest None while later decodes retain order.</summary>
+        [Test]
+        public void ReceiveFifoOverflowCommitsOldestToNone()
+        {
+            using var lease = Source(2, out var source);
+            Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 10, 1));
+            Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 20, 2));
+            Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 30, 3));
+            var overflow = source.Capture();
+            Assert.That(Traffic(overflow, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes, Is.EqualTo(60));
+            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Hello, 0, 0));
+            var oneDecoded = source.Capture();
+            Assert.That(Traffic(oneDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes, Is.EqualTo(40));
+            Assert.That(Traffic(oneDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.Hello).Bytes, Is.EqualTo(20));
+            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Ack, 0, 0));
+            var allDecoded = source.Capture();
+            Assert.That(Traffic(allDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes, Is.EqualTo(10));
+            Assert.That(Traffic(allDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.Ack).Bytes, Is.EqualTo(30));
+            Assert.That(allDecoded.ReceivedBytes, Is.EqualTo(60));
+        }
+
+        /// <summary>Verifies send owns both totals and immediate packet-kind attribution.</summary>
+        [Test]
+        public void SendAttributesItsOwnTransportDelta()
+        {
+            using var lease = Source(4, out var source);
+            Observe(source, TrafficTrace(NetworkPhase.Send, NetworkPacketKind.Disconnect, 11, 2));
+            var data = source.Capture();
+            Assert.That(data.SentBytes, Is.EqualTo(11));
+            Assert.That(data.SentPackets, Is.EqualTo(2));
+            Assert.That(Traffic(data, NetworkTrafficDirection.Send, NetworkPacketKind.Disconnect).Bytes, Is.EqualTo(11));
+            Assert.That(data.ReceivedBytes, Is.Zero);
+        }
+
+        /// <summary>Verifies the shared cumulative helper clamps negatives and saturates deterministically.</summary>
+        [Test]
+        public void SaturatingAddClampsAndCaps()
+        {
+            Assert.That(NetworkDebugSource.SaturatingAdd(-5, 7), Is.EqualTo(7));
+            Assert.That(NetworkDebugSource.SaturatingAdd(9, -2), Is.EqualTo(9));
+            Assert.That(NetworkDebugSource.SaturatingAdd(long.MaxValue - 2, 5), Is.EqualTo(long.MaxValue));
+            Assert.That(NetworkDebugSource.SaturatingAdd(long.MaxValue, long.MaxValue), Is.EqualTo(long.MaxValue));
         }
 
         private static NetworkTraceEvent Trace(uint tick) => new NetworkTraceEvent(
@@ -162,6 +267,29 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
         private static NetworkSnapshotDiagnostics Snapshot(uint tick) => new NetworkSnapshotDiagnostics(
             NetworkRole.Client, 1, 2, 3, new ScopeId(4), tick, new SchemaFingerprint(5, 6), 7,
             8, 9, 10, 2, 20, tick - 1, tick, 4, 100);
+
+        private static IDisposable Source(int capacity, out NetworkDebugSource source) =>
+            NetworkDebugRegistry.Register("source", "Source", Array.Empty<NetworkSchemaEntry>(), out source,
+                traceCapacity: capacity);
+
+        private static void Observe(NetworkDebugSource source, NetworkTraceEvent value) => source.Observe(in value);
+
+        private static NetworkTraceEvent TrafficTrace(NetworkPhase phase, NetworkPacketKind kind, int bytes,
+            int packets, NetworkResultCategory result = NetworkResultCategory.Success) => new NetworkTraceEvent(
+            phase, NetworkTraceKind.Point, result, NetworkRole.Client, 1, 2, 3, 1, 0, bytes, packets,
+            0, 0, 0, 0, 0, 1, 1, 1, kind);
+
+        private static NetworkTrafficCounter Traffic(NetworkDebugData data, NetworkTrafficDirection direction,
+            NetworkPacketKind kind)
+        {
+            for (var i = 0; i < data.Traffic.Count; i++)
+            {
+                var value = data.Traffic[i];
+                if (value.Direction == direction && value.PacketKind == kind) return value;
+            }
+            Assert.Fail($"Traffic row {direction}/{kind} was not published.");
+            return default;
+        }
 
         private readonly struct TestWorld : IWorldType { }
         private readonly struct TestEntity : IEntityType, INetworkType

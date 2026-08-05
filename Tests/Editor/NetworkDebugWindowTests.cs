@@ -130,9 +130,12 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
         {
             using var lease = NetworkDebugRegistry.Register("client", "Client", Array.Empty<NetworkSchemaEntry>(),
                 out var source, worldName: "Main");
-            var received = Trace(NetworkPhase.Receive, NetworkPacketKind.Hello, 100, 2,
+            var received = Trace(NetworkPhase.Receive, NetworkPacketKind.None, 100, 2,
                 NetworkResultCategory.Success, 20, 3);
             source.Observe(in received);
+            var decoded = Trace(NetworkPhase.Decode, NetworkPacketKind.Hello, 40, 1,
+                NetworkResultCategory.Success, 20, 3);
+            source.Observe(in decoded);
             var sent = Trace(NetworkPhase.Send, NetworkPacketKind.FullSnapshot, 250, 1,
                 NetworkResultCategory.Success, 20, 3);
             source.Observe(in sent);

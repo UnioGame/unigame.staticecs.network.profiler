@@ -53,6 +53,7 @@ The observer stream, clocks, and endpoint flow are documented in the cross-packa
 - Optional: supply a bounded world display name at registration; it is metadata only and never retains a world or ECS handle.
 - Optional: assign a privacy-safe numeric profiler `source` lane. Do not derive it from peers, epochs, schema fingerprints, or payload data.
 - Delta counters emit positive totals. Gauge counters retain the latest value and flush at the end of the Unity frame.
+- Receive owns inbound transport totals; the next ordered Decode attributes that retained delta to its validated packet kind. Pending and overflowed rows remain visible under `None`.
 - `Cycle` is mock or replay transport ordering, while network diagnostics use `ServerTick`; neither Unity frame nor Static ECS tracking tick is presented as authoritative simulation time.
 
 ## Limitations
@@ -60,3 +61,4 @@ The observer stream, clocks, and endpoint flow are documented in the cross-packa
 - The Debug Window is Editor-only and read-only; it cannot mutate ECS entities, sessions, or transports.
 - Trace and history are process-local bounded diagnostics, not a persistent capture service.
 - Detailed records intentionally omit payload bytes, command values, ECS handles, and Unity object references.
+- Receive-to-Decode attribution assumes the endpoint's synchronous ordered pipeline; asynchronous decode requires correlation metadata.

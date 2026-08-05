@@ -12,6 +12,7 @@ namespace UniGame.StaticEcs.Network.Profiler
         private readonly RingBuffer<NetworkTraceEvent> _trace;
         private readonly RingBuffer<NetworkSessionDiagnostics> _sessions;
         private readonly RingBuffer<NetworkSnapshotDiagnostics> _snapshots;
+        private readonly PendingTrafficBuffer _pendingReceive;
         private readonly long[] _receivedBytesByKind;
         private readonly long[] _sentBytesByKind;
         private readonly long[] _receivedPacketsByKind;
@@ -46,6 +47,7 @@ namespace UniGame.StaticEcs.Network.Profiler
             _trace = new RingBuffer<NetworkTraceEvent>(traceCapacity);
             _sessions = new RingBuffer<NetworkSessionDiagnostics>(historyCapacity);
             _snapshots = new RingBuffer<NetworkSnapshotDiagnostics>(historyCapacity);
+            _pendingReceive = new PendingTrafficBuffer(traceCapacity);
             var packetKindCount = Enum.GetValues(typeof(NetworkPacketKind)).Length;
             _receivedBytesByKind = new long[packetKindCount];
             _sentBytesByKind = new long[packetKindCount];
@@ -151,6 +153,7 @@ namespace UniGame.StaticEcs.Network.Profiler
                 _trace.Clear();
                 _sessions.Clear();
                 _snapshots.Clear();
+                _pendingReceive.Clear();
                 Array.Clear(_receivedBytesByKind, 0, _receivedBytesByKind.Length);
                 Array.Clear(_sentBytesByKind, 0, _sentBytesByKind.Length);
                 Array.Clear(_receivedPacketsByKind, 0, _receivedPacketsByKind.Length);
@@ -173,38 +176,63 @@ namespace UniGame.StaticEcs.Network.Profiler
             _tickGap = value.ClientServerTickGap;
             if (value.SchemaFingerprint != SchemaFingerprint.Empty) _fingerprint = value.SchemaFingerprint;
             if (value.Kind == NetworkTraceKind.Begin) return;
-            if (value.Result != NetworkResultCategory.None && value.Result != NetworkResultCategory.Success) _errors++;
+            if (value.Result != NetworkResultCategory.None && value.Result != NetworkResultCategory.Success)
+                _errors = SaturatingAdd(_errors, 1);
             var kind = (int)value.PacketKind;
             if (kind < 0 || kind >= _receivedBytesByKind.Length) kind = (int)NetworkPacketKind.None;
             var bytes = Math.Max(0, value.Bytes);
             var packets = Math.Max(0, value.Packets);
             if (value.Phase == NetworkPhase.Receive)
             {
-                _receivedBytes += bytes;
-                _receivedPackets += packets;
-                _receivedBytesByKind[kind] += bytes;
-                _receivedPacketsByKind[kind] += packets;
+                _receivedBytes = SaturatingAdd(_receivedBytes, bytes);
+                _receivedPackets = SaturatingAdd(_receivedPackets, packets);
+                if (_pendingReceive.Add(new PendingTraffic(bytes, packets), out var overflow))
+                    CommitReceive(NetworkPacketKind.None, overflow);
+            }
+            else if (value.Phase == NetworkPhase.Decode)
+            {
+                if (_pendingReceive.TryTake(out var pending)) CommitReceive((NetworkPacketKind)kind, pending);
             }
             else if (value.Phase == NetworkPhase.Send)
             {
-                _sentBytes += bytes;
-                _sentPackets += packets;
-                _sentBytesByKind[kind] += bytes;
-                _sentPacketsByKind[kind] += packets;
+                _sentBytes = SaturatingAdd(_sentBytes, bytes);
+                _sentPackets = SaturatingAdd(_sentPackets, packets);
+                _sentBytesByKind[kind] = SaturatingAdd(_sentBytesByKind[kind], bytes);
+                _sentPacketsByKind[kind] = SaturatingAdd(_sentPacketsByKind[kind], packets);
             }
         }
 
         private NetworkTrafficCounter[] CopyTraffic()
         {
+            var receivedBytes = (long[])_receivedBytesByKind.Clone();
+            var receivedPackets = (long[])_receivedPacketsByKind.Clone();
+            _pendingReceive.Totals(out var pendingBytes, out var pendingPackets);
+            var none = (int)NetworkPacketKind.None;
+            receivedBytes[none] = SaturatingAdd(receivedBytes[none], pendingBytes);
+            receivedPackets[none] = SaturatingAdd(receivedPackets[none], pendingPackets);
             var count = _receivedBytesByKind.Length * 2;
             var result = new NetworkTrafficCounter[count];
             for (var i = 0; i < _receivedBytesByKind.Length; i++)
                 result[i] = new NetworkTrafficCounter(NetworkTrafficDirection.Receive, (NetworkPacketKind)i,
-                    _receivedBytesByKind[i], _receivedPacketsByKind[i]);
+                    receivedBytes[i], receivedPackets[i]);
             for (var i = 0; i < _sentBytesByKind.Length; i++)
                 result[_receivedBytesByKind.Length + i] = new NetworkTrafficCounter(NetworkTrafficDirection.Send,
                     (NetworkPacketKind)i, _sentBytesByKind[i], _sentPacketsByKind[i]);
             return result;
+        }
+
+        private void CommitReceive(NetworkPacketKind kind, PendingTraffic value)
+        {
+            var index = (int)kind;
+            _receivedBytesByKind[index] = SaturatingAdd(_receivedBytesByKind[index], value.Bytes);
+            _receivedPacketsByKind[index] = SaturatingAdd(_receivedPacketsByKind[index], value.Packets);
+        }
+
+        internal static long SaturatingAdd(long current, long delta)
+        {
+            current = Math.Max(0, current);
+            delta = Math.Max(0, delta);
+            return current > long.MaxValue - delta ? long.MaxValue : current + delta;
         }
 
         private static string NormalizeWorldName(string value)
@@ -265,6 +293,76 @@ namespace UniGame.StaticEcs.Network.Profiler
                 Array.Clear(_values, 0, _values.Length);
                 _start = 0;
                 _count = 0;
+            }
+        }
+
+        private readonly struct PendingTraffic
+        {
+            internal PendingTraffic(long bytes, long packets)
+            {
+                Bytes = bytes;
+                Packets = packets;
+            }
+
+            internal long Bytes { get; }
+            internal long Packets { get; }
+        }
+
+        private sealed class PendingTrafficBuffer
+        {
+            private readonly PendingTraffic[] _values;
+            private int _start;
+            private int _count;
+
+            internal PendingTrafficBuffer(int capacity) => _values = new PendingTraffic[capacity];
+
+            internal bool Add(PendingTraffic value, out PendingTraffic overflow)
+            {
+                var overflowed = _count == _values.Length;
+                overflow = overflowed ? Take() : default;
+                _values[(_start + _count) % _values.Length] = value;
+                _count++;
+                return overflowed;
+            }
+
+            internal bool TryTake(out PendingTraffic value)
+            {
+                if (_count == 0)
+                {
+                    value = default;
+                    return false;
+                }
+
+                value = Take();
+                return true;
+            }
+
+            internal void Totals(out long bytes, out long packets)
+            {
+                bytes = 0;
+                packets = 0;
+                for (var i = 0; i < _count; i++)
+                {
+                    var value = _values[(_start + i) % _values.Length];
+                    bytes = SaturatingAdd(bytes, value.Bytes);
+                    packets = SaturatingAdd(packets, value.Packets);
+                }
+            }
+
+            internal void Clear()
+            {
+                Array.Clear(_values, 0, _values.Length);
+                _start = 0;
+                _count = 0;
+            }
+
+            private PendingTraffic Take()
+            {
+                var value = _values[_start];
+                _values[_start] = default;
+                _start = (_start + 1) % _values.Length;
+                _count--;
+                return value;
             }
         }
     }
