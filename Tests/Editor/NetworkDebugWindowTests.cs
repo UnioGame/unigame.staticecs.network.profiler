@@ -66,13 +66,13 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(Resources.FindObjectsOfTypeAll<NetworkDebugWindow>(), Has.Length.EqualTo(1));
         }
 
-        /// <summary>Verifies closing disables the scheduled poll item.</summary>
+        /// <summary>Verifies the window disable lifecycle stops the scheduled poll item.</summary>
         [Test]
-        public void CloseStopsPolling()
+        public void DisableLifecycleStopsPolling()
         {
             var window = CreateWindow();
             Assert.That(window.PollingActive, Is.True);
-            window.Close();
+            window.DisableForTests();
             Assert.That(window.PollingActive, Is.False);
         }
 
@@ -176,7 +176,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             }
             finally
             {
-                window.Close();
+                DestroyWindow(window);
             }
         }
 
@@ -200,7 +200,13 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
         private static void CloseWindows()
         {
             var windows = Resources.FindObjectsOfTypeAll<NetworkDebugWindow>();
-            for (var i = 0; i < windows.Length; i++) windows[i].Close();
+            for (var i = 0; i < windows.Length; i++) DestroyWindow(windows[i]);
+        }
+
+        private static void DestroyWindow(NetworkDebugWindow window)
+        {
+            if (window == null) return;
+            UnityEngine.Object.DestroyImmediate(window);
         }
 
         private static void ClearPreferences()
