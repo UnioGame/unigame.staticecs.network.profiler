@@ -3,7 +3,8 @@
   "rootNamespace": "UniGame.StaticEcs.Network.Profiler.Editor",
   "references": [
     "unigame.staticecs.network.profiler",
-    "unigame.staticecs.network"
+    "unigame.staticecs.network",
+    "unigame.staticecs.network.protocol"
   ],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
