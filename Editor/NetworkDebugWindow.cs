@@ -36,6 +36,13 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
         private IVisualElementScheduledItem _polling;
         private NetworkDebugSource _source;
         private string _tab = "Overview";
+        private bool _pollingActive;
+        private int _presentationRefreshCount;
+
+        internal bool PollingActive => _pollingActive;
+        internal int PresentationRefreshCount => _presentationRefreshCount;
+        internal string RenderedText => _contentLabel?.text ?? string.Empty;
+        internal NetworkDebugSource SelectedSource => _source;
 
         /// <summary>Opens or focuses the singleton Network Debug window.</summary>
         [MenuItem("Tools/Static ECS/Network Debug")]
@@ -66,6 +73,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
             RefreshSources();
             RefreshDisplay();
             _polling = rootVisualElement.schedule.Execute(Poll).Every(PollIntervalMilliseconds);
+            _pollingActive = true;
         }
 
         private void OnDisable()
@@ -73,14 +81,19 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
             SavePreferences();
             _polling?.Pause();
             _polling = null;
+            _pollingActive = false;
         }
 
         [InitializeOnLoadMethod]
         private static void RegisterDomainReloadCleanup()
         {
-            AssemblyReloadEvents.beforeAssemblyReload -= NetworkDebugRegistry.Reset;
-            AssemblyReloadEvents.beforeAssemblyReload += NetworkDebugRegistry.Reset;
+            AssemblyReloadEvents.beforeAssemblyReload -= BeforeAssemblyReload;
+            AssemblyReloadEvents.beforeAssemblyReload += BeforeAssemblyReload;
         }
+
+        private static void BeforeAssemblyReload() => NetworkDebugRegistry.Reset();
+
+        internal static void BeforeAssemblyReloadForTests() => BeforeAssemblyReload();
 
         private void BindControls()
         {
@@ -119,6 +132,12 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
                 RefreshDisplay();
             }
         }
+
+        internal void PollForTests() => Poll();
+        internal void RefreshSourcesForTests() => ManualRefresh();
+        internal void SetLiveForTests(bool value) => _liveToggle.value = value;
+        internal void SelectTabForTests(string value) => SelectTab(value);
+        internal void DisableForTests() => OnDisable();
 
         private void ManualRefresh()
         {
@@ -204,6 +223,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
 
         private void RefreshDisplay()
         {
+            _presentationRefreshCount++;
             _contentTitle.text = _tab;
             var hasSource = _source != null;
             _noSource.style.display = hasSource ? DisplayStyle.None : DisplayStyle.Flex;
@@ -241,7 +261,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
             else if (tab == "Sessions") FormatSessions(data, text);
             else if (tab == "Snapshots") FormatSnapshots(data, text);
             else if (tab == "Commands") FormatTrace(data, text, NetworkPhase.CommandDispatch, false);
-            else if (tab == "Traffic") FormatTrace(data, text, default, true);
+            else if (tab == "Traffic") FormatTraffic(data, text);
             else if (tab == "Schema") FormatSchema(data, text);
             else FormatTrace(data, text, default, false);
             return text.ToString();
@@ -250,6 +270,13 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
         private static void FormatOverview(NetworkDebugData data, StringBuilder text)
         {
             text.AppendLine($"Source: {data.DisplayName} ({data.SourceId})");
+            text.AppendLine($"World: {(string.IsNullOrEmpty(data.WorldName) ? "(not supplied)" : data.WorldName)}");
+            text.AppendLine($"Role: {(data.HasRole ? data.Role.ToString() : "(not observed)")}");
+            text.AppendLine($"Schema fingerprint: {data.SchemaFingerprint}");
+            var clientTick = (long)data.ServerTick - data.ClientServerTickGap;
+            text.AppendLine($"Authoritative tick: {data.ServerTick}; client tick: {clientTick}; gap: {data.ClientServerTickGap}");
+            text.AppendLine($"Traffic totals: receive={data.ReceivedPackets} packets/{data.ReceivedBytes} bytes; send={data.SentPackets} packets/{data.SentBytes} bytes");
+            text.AppendLine($"Errors: {data.Errors}");
             text.AppendLine($"Revision: {data.Revision}");
             text.AppendLine($"Schema rows: {data.Schema.Count}");
             text.AppendLine($"Session samples: {data.Sessions.Count}");
@@ -293,6 +320,27 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
                 var row = data.Schema[i];
                 text.AppendLine($"{row.Kind,-10} 0x{row.TypeId:X8} v{row.Version} maxBytes={row.MaxBytes} maxCount={row.MaxCount} {row.TypeName}");
             }
+        }
+
+        private static void FormatTraffic(NetworkDebugData data, StringBuilder text)
+        {
+            text.AppendLine($"Receive total: {data.ReceivedPackets} packets, {data.ReceivedBytes} bytes");
+            for (var i = 0; i < data.Traffic.Count; i++)
+            {
+                var row = data.Traffic[i];
+                if (row.Direction != NetworkTrafficDirection.Receive) continue;
+                text.AppendLine($"  {row.PacketKind}: {row.Packets} packets, {row.Bytes} bytes");
+            }
+            text.AppendLine();
+            text.AppendLine($"Send total: {data.SentPackets} packets, {data.SentBytes} bytes");
+            for (var i = 0; i < data.Traffic.Count; i++)
+            {
+                var row = data.Traffic[i];
+                if (row.Direction != NetworkTrafficDirection.Send) continue;
+                text.AppendLine($"  {row.PacketKind}: {row.Packets} packets, {row.Bytes} bytes");
+            }
+            text.AppendLine();
+            text.AppendLine($"Errors: {data.Errors}");
         }
 
         private static void FormatTrace(NetworkDebugData data, StringBuilder text, NetworkPhase phase, bool trafficOnly)

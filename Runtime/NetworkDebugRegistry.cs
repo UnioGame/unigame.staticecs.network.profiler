@@ -13,10 +13,21 @@ namespace UniGame.StaticEcs.Network.Profiler
 
         /// <summary>Creates and registers a source, copying schema rows before publication.</summary>
         public static IDisposable Register(string sourceId, string displayName, IReadOnlyList<NetworkSchemaEntry> schema,
-            out NetworkDebugSource source, int traceCapacity = 512, int historyCapacity = 128)
+            out NetworkDebugSource source, int traceCapacity = 512, int historyCapacity = 128, string worldName = "")
         {
-            source = new NetworkDebugSource(sourceId, displayName, schema, traceCapacity, historyCapacity);
+            source = new NetworkDebugSource(sourceId, displayName, schema, traceCapacity, historyCapacity, worldName);
             return Register(source);
+        }
+
+        /// <summary>Registers a debug source and creates one observer that also emits Unity Profiler telemetry.</summary>
+        public static IDisposable RegisterWithProfiler(string sourceId, string displayName,
+            IReadOnlyList<NetworkSchemaEntry> schema, out NetworkProfilerDebugObserver observer,
+            uint profilerSource = 0, int traceCapacity = 512, int historyCapacity = 128, string worldName = "")
+        {
+            var lease = Register(sourceId, displayName, schema, out var debugSource, traceCapacity,
+                historyCapacity, worldName);
+            observer = new NetworkProfilerDebugObserver(new ProfilerObserver(profilerSource), debugSource);
+            return lease;
         }
 
         /// <summary>Registers a caller-owned source and returns an idempotent removal lease.</summary>

@@ -26,13 +26,14 @@ The observer implements `INetworkObserver` and remains caller-owned. Network end
 Register a detailed endpoint diagnostics source and pass it as the endpoint observer:
 
 ```csharp
-var lease = NetworkDebugRegistry.Register(
+var lease = NetworkDebugRegistry.RegisterWithProfiler(
     "client-main",
     "Client Main",
     schema.Entries,
-    out var debugSource);
+    out var diagnostics,
+    worldName: typeof(GameWorld).Name);
 
-var client = new NetworkClient<GameWorld>(transport, schema, scope, debugSource);
+var client = new NetworkClient<GameWorld>(transport, schema, scope, diagnostics);
 ```
 
 Keep the returned lease with the endpoint lifetime and dispose it during shutdown. Open
@@ -48,7 +49,8 @@ The observer stream, clocks, and endpoint flow are documented in the cross-packa
 - Required: reference `unigame.staticecs.network.profiler` from the endpoint assembly.
 - Required for Unity Profiler telemetry: pass a `ProfilerObserver` to each endpoint whose trace stream should be sampled.
 - Required for the Debug Window: register a unique stable source id and dispose its lease during endpoint shutdown.
-- Optional: configure per-source trace and history capacities; defaults are 512 trace rows and 128 session/snapshot rows.
+- Optional: configure per-source trace and history capacities; defaults are 512 trace rows and 128 session/snapshot rows. Trace retention is opt-in and starts disabled.
+- Optional: supply a bounded world display name at registration; it is metadata only and never retains a world or ECS handle.
 - Optional: assign a privacy-safe numeric profiler `source` lane. Do not derive it from peers, epochs, schema fingerprints, or payload data.
 - Delta counters emit positive totals. Gauge counters retain the latest value and flush at the end of the Unity frame.
 - `Cycle` is mock or replay transport ordering, while network diagnostics use `ServerTick`; neither Unity frame nor Static ECS tracking tick is presented as authoritative simulation time.

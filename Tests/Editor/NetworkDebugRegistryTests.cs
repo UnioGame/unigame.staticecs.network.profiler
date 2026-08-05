@@ -6,6 +6,9 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
     using System.Text;
     using FFS.Libraries.StaticEcs;
     using NUnit.Framework;
+    using Unity.Profiling;
+    using UnityEngine;
+    using UnityEngine.TestTools;
 
     /// <summary>Verifies bounded, lifetime-safe network diagnostics publication.</summary>
     public sealed class NetworkDebugRegistryTests
@@ -46,7 +49,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             factory.Entity<TestEntity>(new NetworkTypeId(42));
             var schema = factory.Freeze();
             using var lease = NetworkDebugRegistry.Register("source", "Source", schema.Entries, out var source,
-                traceCapacity: 2, historyCapacity: 2);
+                traceCapacity: 2, historyCapacity: 2, worldName: "Main");
 
             for (var i = 1; i <= 3; i++)
             {
@@ -62,6 +65,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(first.Schema, Has.Count.EqualTo(1));
             Assert.That(first.Schema[0].TypeId, Is.EqualTo(42));
             Assert.That(first.Schema[0].TypeName, Does.EndWith(nameof(TestEntity)));
+            Assert.That(first.WorldName, Is.EqualTo("Main"));
             Assert.That(first.Trace, Has.Count.EqualTo(2));
             Assert.That(first.Trace[0].ServerTick, Is.EqualTo(2));
             Assert.That(first.Sessions, Has.Count.EqualTo(2));
@@ -75,12 +79,38 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(second.Sessions, Has.Count.EqualTo(2));
         }
 
+        /// <summary>Verifies the purpose-built observer delivers phase and detailed callbacks.</summary>
+        [UnityTest]
+        public IEnumerator CompositeDeliversEveryDiagnosticsCallback()
+        {
+            using var lease = NetworkDebugRegistry.RegisterWithProfiler("source", "Source",
+                Array.Empty<NetworkSchemaEntry>(), out var observer, profilerSource: 23);
+            observer.DebugSource.TraceEnabled = true;
+            using var recorder = ProfilerRecorder.StartNew(ProfilerCategory.Network, "SECS.Net.Receive", 4);
+            var trace = Trace(1);
+            observer.Observe(in trace);
+            var session = Session(1);
+            observer.ObserveSession(in session);
+            var snapshot = Snapshot(1);
+            observer.ObserveSnapshot(in snapshot);
+
+            yield return null;
+
+            var data = observer.DebugSource.Capture();
+            Assert.That(observer.Profiler.Source, Is.EqualTo(23));
+            Assert.That(data.Trace, Has.Count.EqualTo(1));
+            Assert.That(data.Sessions, Has.Count.EqualTo(1));
+            Assert.That(data.Snapshots, Has.Count.EqualTo(1));
+            Assert.That(recorder.Count, Is.GreaterThanOrEqualTo(1));
+        }
+
         /// <summary>Verifies trace pause affects collection only and export remains strict payload-free NDJSON.</summary>
         [Test]
         public void TracePauseAndExportArePresentationOnlyAndPayloadFree()
         {
             using var lease = NetworkDebugRegistry.Register("source", "Source", Array.Empty<NetworkSchemaEntry>(),
                 out var source, traceCapacity: 4);
+            Assert.That(source.TraceEnabled, Is.False);
             source.TraceEnabled = false;
             var ignored = Trace(1);
             source.Observe(in ignored);
@@ -97,11 +127,28 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             stream.Position = 0;
             using var reader = new StreamReader(stream, Encoding.UTF8, false, 1024, true);
             var line = reader.ReadLine();
+            var parsed = JsonUtility.FromJson<TraceLine>(line);
             Assert.That(line, Does.StartWith("{\"phase\":"));
             Assert.That(line, Does.Contain("\"server_tick\":2"));
+            Assert.That(parsed.phase, Is.EqualTo("receive"));
+            Assert.That(parsed.server_tick, Is.EqualTo(2));
             Assert.That(line, Does.Not.Contain("payload"));
             Assert.That(line, Does.Not.Contain("command_value"));
             Assert.That(reader.ReadLine(), Is.Null);
+        }
+
+        /// <summary>Verifies subsystem-style reset unregisters sources and clears their retained state.</summary>
+        [Test]
+        public void ResetClearsRegistryAndRetainedState()
+        {
+            using var lease = NetworkDebugRegistry.Register("source", "Source", Array.Empty<NetworkSchemaEntry>(),
+                out var source);
+            source.TraceEnabled = true;
+            var trace = Trace(4);
+            source.Observe(in trace);
+            NetworkDebugRegistry.Reset();
+            Assert.That(NetworkDebugRegistry.Sources(), Is.Empty);
+            Assert.That(source.Capture().Trace, Is.Empty);
         }
 
         private static NetworkTraceEvent Trace(uint tick) => new NetworkTraceEvent(
@@ -121,6 +168,15 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
         {
             /// <summary>Returns the isolated test entity kind.</summary>
             public byte Id() => 1;
+        }
+
+        [Serializable]
+        private sealed class TraceLine
+        {
+            /// <summary>Parsed strict phase name.</summary>
+            public string phase = string.Empty;
+            /// <summary>Parsed authoritative tick.</summary>
+            public uint server_tick = 0;
         }
     }
 }

@@ -4,7 +4,7 @@
             <ui:DropdownField name="source-dropdown" label="Source" class="source-dropdown" />
             <ui:Toggle name="live-toggle" label="Live" value="true" />
             <ui:Button name="refresh-button" text="Refresh" />
-            <ui:Toggle name="trace-toggle" label="Trace" value="true" />
+            <ui:Toggle name="trace-toggle" label="Trace" value="false" />
             <ui:Button name="clear-trace-button" text="Clear Trace" />
             <ui:Button name="export-button" text="Export NDJSON" />
             <ui:VisualElement class="toolbar-spacer" />
