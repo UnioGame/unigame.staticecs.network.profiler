@@ -36,6 +36,17 @@ var lease = NetworkDebugRegistry.RegisterWithProfiler(
 var client = new NetworkClient<GameWorld>(transport, schema, scope, diagnostics);
 ```
 
+```mermaid
+flowchart LR
+    E["Network endpoint phases"] --> C["NetworkProfilerDebugObserver"]
+    C --> P["ProfilerObserver"]
+    P --> U["Unity Profiler markers and counters"]
+    C --> D["NetworkDebugSource"]
+    D --> R["NetworkDebugRegistry"]
+    R --> W["UI Toolkit Network Debug Window"]
+    D --> N["Bounded opt-in NDJSON trace"]
+```
+
 Keep the returned lease with the endpoint lifetime and dispose it during shutdown. Open
 `Tools > Static ECS > Network Debug` to inspect registered sources. Live pause stops display
 refresh only; endpoint diagnostics continue. Trace collection can be disabled or cleared,
