@@ -1,0 +1,33 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:VisualElement class="network-debug-root">
+        <ui:VisualElement class="network-debug-toolbar">
+            <ui:DropdownField name="source-dropdown" label="Source" class="source-dropdown" />
+            <ui:Toggle name="live-toggle" label="Live" value="true" />
+            <ui:Button name="refresh-button" text="Refresh" />
+            <ui:Toggle name="trace-toggle" label="Trace" value="true" />
+            <ui:Button name="clear-trace-button" text="Clear Trace" />
+            <ui:Button name="export-button" text="Export NDJSON" />
+            <ui:VisualElement class="toolbar-spacer" />
+            <ui:Button name="close-button" text="Close" />
+        </ui:VisualElement>
+        <ui:TwoPaneSplitView name="main-split" fixed-pane-index="0" fixed-pane-initial-dimension="190" orientation="Horizontal" class="main-split">
+            <ui:VisualElement name="sidebar" class="sidebar">
+                <ui:Label text="NETWORK DEBUG" class="sidebar-title" />
+                <ui:Button name="tab-Overview" text="Overview" class="tab-button selected" />
+                <ui:Button name="tab-Sessions" text="Sessions" class="tab-button" />
+                <ui:Button name="tab-Snapshots" text="Snapshots" class="tab-button" />
+                <ui:Button name="tab-Commands" text="Commands" class="tab-button" />
+                <ui:Button name="tab-Traffic" text="Traffic" class="tab-button" />
+                <ui:Button name="tab-Schema" text="Schema" class="tab-button" />
+                <ui:Button name="tab-Trace" text="Trace" class="tab-button" />
+            </ui:VisualElement>
+            <ui:VisualElement name="right-pane" class="right-pane">
+                <ui:Label name="content-title" text="Overview" class="content-title" />
+                <ui:Label name="no-source" text="No network diagnostics source is registered." class="no-source" />
+                <ui:ScrollView name="content-scroll" class="content-scroll">
+                    <ui:Label name="content-label" class="content-label" />
+                </ui:ScrollView>
+            </ui:VisualElement>
+        </ui:TwoPaneSplitView>
+    </ui:VisualElement>
+</ui:UXML>

@@ -1,0 +1,17 @@
+{
+  "name": "unigame.staticecs.network.profiler.editor",
+  "rootNamespace": "UniGame.StaticEcs.Network.Profiler.Editor",
+  "references": [
+    "unigame.staticecs.network.profiler",
+    "unigame.staticecs.network"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

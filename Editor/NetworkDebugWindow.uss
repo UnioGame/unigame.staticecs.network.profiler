@@ -1,0 +1,79 @@
+.network-debug-root {
+    flex-grow: 1;
+    background-color: #202124;
+    color: #d8d8d8;
+}
+
+.network-debug-toolbar {
+    height: 30px;
+    min-height: 30px;
+    flex-direction: row;
+    align-items: center;
+    padding-left: 4px;
+    padding-right: 4px;
+    border-bottom-width: 1px;
+    border-bottom-color: #111214;
+}
+
+.source-dropdown {
+    width: 280px;
+}
+
+.toolbar-spacer {
+    flex-grow: 1;
+}
+
+.main-split {
+    flex-grow: 1;
+}
+
+.sidebar {
+    min-width: 190px;
+    background-color: #292b2f;
+    padding: 8px;
+}
+
+.sidebar-title {
+    unity-font-style: bold;
+    font-size: 10px;
+    color: #8f949d;
+    margin-bottom: 8px;
+}
+
+.tab-button {
+    height: 28px;
+    margin-bottom: 3px;
+    unity-text-align: middle-left;
+}
+
+.tab-button.selected {
+    background-color: #315d85;
+    color: white;
+}
+
+.right-pane {
+    flex-grow: 1;
+    padding: 12px;
+}
+
+.content-title {
+    font-size: 17px;
+    unity-font-style: bold;
+    margin-bottom: 10px;
+}
+
+.no-source {
+    flex-grow: 1;
+    unity-text-align: middle-center;
+    color: #9da0a6;
+}
+
+.content-scroll {
+    flex-grow: 1;
+}
+
+.content-label {
+    white-space: normal;
+    -unity-font: resource("Fonts/RobotoMono-Regular");
+    font-size: 12px;
+}

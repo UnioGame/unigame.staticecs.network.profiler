@@ -3,8 +3,10 @@
   "rootNamespace": "UniGame.StaticEcs.Network.Profiler.Tests",
   "references": [
     "unigame.staticecs.network.profiler",
+    "unigame.staticecs.network.profiler.editor",
     "unigame.staticecs.network",
     "unigame.staticecs.network.protocol",
+    "FFS.StaticEcs",
     "Unity.Profiling.Core"
   ],
   "includePlatforms": ["Editor"],
