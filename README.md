@@ -48,7 +48,7 @@ flowchart LR
 ```
 
 Keep the returned lease with the endpoint lifetime and dispose it during shutdown. Open
-`Tools > Static ECS > Network Debug` to inspect registered sources. Live pause stops display
+`Game > Static ECS > Network Debug` to inspect registered sources. Live pause stops display
 refresh only; endpoint diagnostics continue. Trace collection can be disabled or cleared,
 and retained trace rows can be exported as strict payload-free NDJSON.
 

@@ -66,6 +66,16 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(Resources.FindObjectsOfTypeAll<NetworkDebugWindow>(), Has.Length.EqualTo(1));
         }
 
+        /// <summary>Verifies the public Editor command uses the game-owned Static ECS menu root.</summary>
+        [Test]
+        public void OpenUsesGameStaticEcsMenu()
+        {
+            var method = typeof(NetworkDebugWindow).GetMethod(nameof(NetworkDebugWindow.Open));
+            var attribute = (MenuItem)Attribute.GetCustomAttribute(method, typeof(MenuItem));
+            Assert.That(attribute, Is.Not.Null);
+            Assert.That(attribute.menuItem, Is.EqualTo("Game/Static ECS/Network Debug"));
+        }
+
         /// <summary>Verifies the window disable lifecycle stops the scheduled poll item.</summary>
         [Test]
         public void DisableLifecycleStopsPolling()

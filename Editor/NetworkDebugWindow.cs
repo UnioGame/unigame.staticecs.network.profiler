@@ -45,7 +45,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
         internal NetworkDebugSource SelectedSource => _source;
 
         /// <summary>Opens or focuses the singleton Network Debug window.</summary>
-        [MenuItem("Tools/Static ECS/Network Debug")]
+        [MenuItem("Game/Static ECS/Network Debug")]
         public static void Open()
         {
             var window = GetWindow<NetworkDebugWindow>();
