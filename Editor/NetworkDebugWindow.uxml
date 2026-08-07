@@ -20,10 +20,31 @@
                 <ui:Button name="tab-Traffic" text="Traffic" class="tab-button" />
                 <ui:Button name="tab-Schema" text="Schema" class="tab-button" />
                 <ui:Button name="tab-Trace" text="Trace" class="tab-button" />
+                <ui:Button name="tab-Simulator" text="Simulator" class="tab-button" />
             </ui:VisualElement>
             <ui:VisualElement name="right-pane" class="right-pane">
                 <ui:Label name="content-title" text="Overview" class="content-title" />
                 <ui:Label name="no-source" text="No network diagnostics source is registered." class="no-source" />
+                <ui:VisualElement name="simulator-controls" style="display: none; flex-direction: row; flex-wrap: wrap; margin-bottom: 6px;">
+                    <ui:DropdownField name="sim-preset" label="Preset" style="min-width: 180px;" />
+                    <ui:IntegerField name="sim-seed" label="Seed" style="min-width: 150px;" />
+                    <ui:IntegerField name="sim-latency" label="Latency ms" style="min-width: 170px;" />
+                    <ui:IntegerField name="sim-jitter" label="Jitter ms" style="min-width: 160px;" />
+                    <ui:FloatField name="sim-loss" label="Loss" style="min-width: 140px;" />
+                    <ui:FloatField name="sim-duplicate" label="Duplicate" style="min-width: 160px;" />
+                    <ui:FloatField name="sim-reorder" label="Reorder" style="min-width: 150px;" />
+                    <ui:LongField name="sim-bandwidth" label="Bytes/sec" style="min-width: 180px;" />
+                    <ui:IntegerField name="sim-max-packets" label="Max packets" style="min-width: 170px;" />
+                    <ui:LongField name="sim-max-bytes" label="Max bytes" style="min-width: 170px;" />
+                    <ui:IntegerField name="sim-decision-capacity" label="Decision rows" style="min-width: 180px;" />
+                    <ui:Button name="sim-apply" text="Apply" />
+                    <ui:Button name="sim-connect" text="Connect" />
+                    <ui:Button name="sim-disconnect" text="Disconnect" />
+                    <ui:Button name="sim-pause" text="Pause/Resume" />
+                    <ui:Button name="sim-reset" text="Reset" />
+                    <ui:Button name="sim-record" text="Record/Stop" />
+                    <ui:Button name="sim-replay" text="Replay Last" />
+                </ui:VisualElement>
                 <ui:ScrollView name="content-scroll" class="content-scroll">
                     <ui:Label name="content-label" class="content-label" />
                 </ui:ScrollView>

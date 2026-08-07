@@ -30,10 +30,12 @@ namespace UniGame.StaticEcs.Network.Profiler
         private uint _serverTick;
         private int _tickGap;
         private bool _traceEnabled;
+        private readonly INetworkSimulatorControl _simulator;
 
         /// <summary>Creates an unregistered source and defensively copies its schema.</summary>
         public NetworkDebugSource(string sourceId, string displayName, IReadOnlyList<NetworkSchemaEntry> schema,
-            int traceCapacity = 512, int historyCapacity = 128, string worldName = "")
+            int traceCapacity = 512, int historyCapacity = 128, string worldName = "",
+            INetworkSimulatorControl simulator = null)
         {
             if (string.IsNullOrWhiteSpace(sourceId)) throw new ArgumentException("A source id is required.", nameof(sourceId));
             if (string.IsNullOrWhiteSpace(displayName)) throw new ArgumentException("A display name is required.", nameof(displayName));
@@ -44,6 +46,7 @@ namespace UniGame.StaticEcs.Network.Profiler
             SourceId = sourceId;
             DisplayName = displayName;
             WorldName = NormalizeWorldName(worldName);
+            _simulator = simulator;
             _schema = CopySchema(schema);
             _trace = new RingBuffer<NetworkTraceEvent>(traceCapacity);
             _sessions = new RingBuffer<NetworkSessionDiagnostics>(historyCapacity);
@@ -64,6 +67,9 @@ namespace UniGame.StaticEcs.Network.Profiler
 
         /// <summary>Gets bounded caller-provided world display metadata.</summary>
         public string WorldName { get; }
+
+        /// <summary>Gets the caller-owned simulator capability, or null for a real/server-only endpoint.</summary>
+        public INetworkSimulatorControl SimulatorControl => _simulator;
 
         /// <summary>Gets or sets whether new phase events are retained in the bounded trace.</summary>
         public bool TraceEnabled
@@ -113,12 +119,19 @@ namespace UniGame.StaticEcs.Network.Profiler
         /// <summary>Returns an immutable defensive snapshot of all retained diagnostics.</summary>
         public NetworkDebugData Capture()
         {
+            var hasSimulator = _simulator != null;
+            var simulationConfig = hasSimulator ? _simulator.CaptureConfig() : default;
+            var simulationStats = hasSimulator ? _simulator.CaptureStats() : default;
+            var simulationDecisions = hasSimulator
+                ? CopyDecisions(_simulator.CaptureDecisions())
+                : Array.Empty<NetworkSimulationDecision>();
             lock (_gate)
             {
                 return new NetworkDebugData(SourceId, DisplayName, WorldName, _revision,
                     (NetworkDebugSchemaEntry[])_schema.Clone(), _trace.Copy(), _sessions.Copy(), _snapshots.Copy(),
                     CopyTraffic(), _hasRole, _role, _fingerprint, _serverTick, _tickGap, _receivedBytes,
-                    _sentBytes, _receivedPackets, _sentPackets, _errors);
+                    _sentBytes, _receivedPackets, _sentPackets, _errors, hasSimulator,
+                    simulationConfig, simulationStats, simulationDecisions);
             }
         }
 
@@ -269,6 +282,14 @@ namespace UniGame.StaticEcs.Network.Profiler
                 var kind = left.Kind.CompareTo(right.Kind);
                 return kind != 0 ? kind : left.TypeId.CompareTo(right.TypeId);
             });
+            return result;
+        }
+
+        private static NetworkSimulationDecision[] CopyDecisions(
+            IReadOnlyList<NetworkSimulationDecision> decisions)
+        {
+            var result = new NetworkSimulationDecision[decisions.Count];
+            for (var i = 0; i < decisions.Count; i++) result[i] = decisions[i];
             return result;
         }
 

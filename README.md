@@ -8,7 +8,8 @@ Privacy-safe Unity Profiler instrumentation and an Editor-only diagnostics windo
 - Reports measured nanosecond phase duration as marker metadata and dedicated duration counters.
 - Reports process-wide traffic, outcome deltas, connection state, snapshot, history, and tick-gap gauges.
 - Publishes bounded immutable debug snapshots through `NetworkDebugRegistry` and `NetworkDebugSource`.
-- Provides a dockable UI Toolkit window for overview, session, snapshot, command, traffic, schema, and trace inspection.
+- Provides a dockable UI Toolkit window for overview, session, snapshot, command, traffic,
+  schema, trace, and optional mock-simulator inspection/control.
 - Keeps payload bytes, command values, ECS handles, entity data, and user identifiers out of diagnostics.
 
 ## Usage
@@ -31,7 +32,8 @@ var lease = NetworkDebugRegistry.RegisterWithProfiler(
     "Client Main",
     schema.Entries,
     out var diagnostics,
-    worldName: typeof(GameWorld).Name);
+    worldName: typeof(GameWorld).Name,
+    simulator: optionalSimulator);
 
 var client = new NetworkClient<GameWorld>(transport, schema, scope, diagnostics);
 ```
@@ -44,6 +46,7 @@ flowchart LR
     C --> D["NetworkDebugSource"]
     D --> R["NetworkDebugRegistry"]
     R --> W["UI Toolkit Network Debug Window"]
+    S["Optional INetworkSimulatorControl"] --> D
     D --> N["Bounded opt-in NDJSON trace"]
 ```
 
@@ -51,6 +54,13 @@ Keep the returned lease with the endpoint lifetime and dispose it during shutdow
 `Game > Static ECS > Network Debug` to inspect registered sources. Live pause stops display
 refresh only; endpoint diagnostics continue. Trace collection can be disabled or cleared,
 and retained trace rows can be exported as strict payload-free NDJSON.
+
+When a source supplies `INetworkSimulatorControl`, the `Simulator` tab exposes preset,
+seed, latency, jitter, loss, duplicate, reorder, bandwidth, connect/disconnect, delivery
+pause, reset, and bounded decision record/replay. Client Main and Embedded Server may point
+to the same capability and therefore show the same link. A Dedicated Server source normally
+has no simulator capability and its controls remain disabled. Registry reset and source
+leases never reset or dispose the caller-owned simulator.
 
 The observer stream, clocks, and endpoint flow are documented in the cross-package
 [network architecture guide](../../../docs/guides/static-ecs-network.md).
@@ -62,6 +72,8 @@ The observer stream, clocks, and endpoint flow are documented in the cross-packa
 - Required for the Debug Window: register a unique stable source id and dispose its lease during endpoint shutdown.
 - Optional: configure per-source trace and history capacities; defaults are 512 trace rows and 128 session/snapshot rows. Trace retention is opt-in and starts disabled.
 - Optional: supply a bounded world display name at registration; it is metadata only and never retains a world or ECS handle.
+- Optional: supply a caller-owned `INetworkSimulatorControl`. `NetworkDebugData` copies its
+  configuration, counters, and payload-free decision timeline before publishing a snapshot.
 - Optional: assign a privacy-safe numeric profiler `source` lane. Do not derive it from peers, epochs, schema fingerprints, or payload data.
 - Delta counters emit positive totals. Gauge counters retain the latest value and flush at the end of the Unity frame.
 - Receive owns inbound transport totals; the next ordered Decode attributes that retained delta to its validated packet kind. Pending and overflowed rows remain visible under `None`.
@@ -69,7 +81,8 @@ The observer stream, clocks, and endpoint flow are documented in the cross-packa
 
 ## Limitations
 
-- The Debug Window is Editor-only and read-only; it cannot mutate ECS entities, sessions, or transports.
+- The Debug Window is Editor-only. It cannot mutate ECS entities or session internals; it
+  may control only an explicitly registered mock simulator capability.
 - Trace and history are process-local bounded diagnostics, not a persistent capture service.
 - Detailed records intentionally omit payload bytes, command values, ECS handles, and Unity object references.
 - Receive-to-Decode attribution assumes the endpoint's synchronous ordered pipeline; asynchronous decode requires correlation metadata.

@@ -20,7 +20,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
 
         private static readonly string[] Tabs =
         {
-            "Overview", "Sessions", "Snapshots", "Commands", "Traffic", "Schema", "Trace"
+            "Overview", "Sessions", "Snapshots", "Commands", "Traffic", "Schema", "Trace", "Simulator"
         };
 
         private readonly List<NetworkDebugSource> _sources = new List<NetworkDebugSource>();
@@ -31,6 +31,19 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
         private Label _noSource;
         private ScrollView _contentScroll;
         private Label _contentLabel;
+        private VisualElement _simulatorControls;
+        private DropdownField _simPreset;
+        private IntegerField _simSeed;
+        private IntegerField _simLatency;
+        private IntegerField _simJitter;
+        private FloatField _simLoss;
+        private FloatField _simDuplicate;
+        private FloatField _simReorder;
+        private LongField _simBandwidth;
+        private IntegerField _simMaxPackets;
+        private LongField _simMaxBytes;
+        private IntegerField _simDecisionCapacity;
+        private IReadOnlyList<NetworkSimulationDecision> _lastRecording = Array.Empty<NetworkSimulationDecision>();
         private TwoPaneSplitView _split;
         private VisualElement _sidebar;
         private IVisualElementScheduledItem _polling;
@@ -38,6 +51,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
         private string _tab = "Overview";
         private bool _pollingActive;
         private int _presentationRefreshCount;
+        private bool _simulatorControlsLoaded;
 
         internal bool PollingActive => _pollingActive;
         internal int PresentationRefreshCount => _presentationRefreshCount;
@@ -51,8 +65,11 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
             var window = GetWindow<NetworkDebugWindow>();
             window.titleContent = new GUIContent("Network Debug");
             window.minSize = new Vector2(760, 420);
-            window.Show();
-            window.Focus();
+            if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
+            {
+                window.Show();
+                window.Focus();
+            }
         }
 
         /// <summary>Builds the window from package-owned UXML and USS assets.</summary>
@@ -104,6 +121,18 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
             _noSource = rootVisualElement.Q<Label>("no-source");
             _contentScroll = rootVisualElement.Q<ScrollView>("content-scroll");
             _contentLabel = rootVisualElement.Q<Label>("content-label");
+            _simulatorControls = rootVisualElement.Q<VisualElement>("simulator-controls");
+            _simPreset = rootVisualElement.Q<DropdownField>("sim-preset");
+            _simSeed = rootVisualElement.Q<IntegerField>("sim-seed");
+            _simLatency = rootVisualElement.Q<IntegerField>("sim-latency");
+            _simJitter = rootVisualElement.Q<IntegerField>("sim-jitter");
+            _simLoss = rootVisualElement.Q<FloatField>("sim-loss");
+            _simDuplicate = rootVisualElement.Q<FloatField>("sim-duplicate");
+            _simReorder = rootVisualElement.Q<FloatField>("sim-reorder");
+            _simBandwidth = rootVisualElement.Q<LongField>("sim-bandwidth");
+            _simMaxPackets = rootVisualElement.Q<IntegerField>("sim-max-packets");
+            _simMaxBytes = rootVisualElement.Q<LongField>("sim-max-bytes");
+            _simDecisionCapacity = rootVisualElement.Q<IntegerField>("sim-decision-capacity");
             _split = rootVisualElement.Q<TwoPaneSplitView>("main-split");
             _sidebar = rootVisualElement.Q<VisualElement>("sidebar");
 
@@ -116,6 +145,16 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
             rootVisualElement.Q<Button>("clear-trace-button").clicked += ClearTrace;
             rootVisualElement.Q<Button>("export-button").clicked += ExportTrace;
             rootVisualElement.Q<Button>("close-button").clicked += Close;
+            _simPreset.choices = new List<string>(Enum.GetNames(typeof(NetworkSimulationPreset)));
+            _simPreset.index = 0;
+            _simPreset.RegisterValueChangedCallback(_ => ApplyPreset());
+            rootVisualElement.Q<Button>("sim-apply").clicked += ApplySimulatorConfig;
+            rootVisualElement.Q<Button>("sim-connect").clicked += () => Control()?.Connect();
+            rootVisualElement.Q<Button>("sim-disconnect").clicked += () => Control()?.Disconnect();
+            rootVisualElement.Q<Button>("sim-pause").clicked += ToggleSimulatorPause;
+            rootVisualElement.Q<Button>("sim-reset").clicked += () => Control()?.Reset();
+            rootVisualElement.Q<Button>("sim-record").clicked += ToggleSimulatorRecording;
+            rootVisualElement.Q<Button>("sim-replay").clicked += ReplayLastRecording;
 
             for (var i = 0; i < Tabs.Length; i++)
             {
@@ -137,6 +176,11 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
         internal void RefreshSourcesForTests() => ManualRefresh();
         internal void SetLiveForTests(bool value) => _liveToggle.value = value;
         internal void SelectTabForTests(string value) => SelectTab(value);
+        internal void SelectSourceForTests(int index)
+        {
+            _sourceDropdown.index = index;
+            SelectSource();
+        }
         internal void DisableForTests() => OnDisable();
 
         private void ManualRefresh()
@@ -173,6 +217,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
         {
             var index = _sourceDropdown.index;
             _source = index >= 0 && index < _sources.Count ? _sources[index] : null;
+            _simulatorControlsLoaded = false;
             if (_source != null) EditorPrefs.SetString(SourcePreference, _source.SourceId);
             _traceToggle.SetEnabled(_source != null);
             if (_source != null) _traceToggle.SetValueWithoutNotify(_source.TraceEnabled);
@@ -182,6 +227,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
         private void SelectTab(string tab)
         {
             _tab = tab;
+            if (tab == "Simulator") _simulatorControlsLoaded = false;
             EditorPrefs.SetString(TabPreference, tab);
             for (var i = 0; i < Tabs.Length; i++)
             {
@@ -226,6 +272,8 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
             _presentationRefreshCount++;
             _contentTitle.text = _tab;
             var hasSource = _source != null;
+            var showSimulator = _tab == "Simulator";
+            _simulatorControls.style.display = showSimulator ? DisplayStyle.Flex : DisplayStyle.None;
             _noSource.style.display = hasSource ? DisplayStyle.None : DisplayStyle.Flex;
             _contentScroll.style.display = hasSource ? DisplayStyle.Flex : DisplayStyle.None;
             if (!hasSource)
@@ -235,6 +283,12 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
             }
 
             var data = _source.Capture();
+            _simulatorControls.SetEnabled(data.HasSimulator);
+            if (showSimulator && data.HasSimulator && !_simulatorControlsLoaded)
+            {
+                LoadSimulatorConfig(data.SimulationConfig);
+                _simulatorControlsLoaded = true;
+            }
             _contentLabel.text = Format(data, _tab);
         }
 
@@ -263,8 +317,101 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
             else if (tab == "Commands") FormatTrace(data, text, NetworkPhase.CommandDispatch, false);
             else if (tab == "Traffic") FormatTraffic(data, text);
             else if (tab == "Schema") FormatSchema(data, text);
+            else if (tab == "Simulator") FormatSimulator(data, text);
             else FormatTrace(data, text, default, false);
             return text.ToString();
+        }
+
+        private INetworkSimulatorControl Control() => _source?.SimulatorControl;
+
+        private void ApplyPreset()
+        {
+            if (!Enum.TryParse(_simPreset.value, out NetworkSimulationPreset preset)) return;
+            LoadSimulatorConfig(NetworkSimulationPresets.Create(preset));
+        }
+
+        private void LoadSimulatorConfig(NetworkSimulationConfig config)
+        {
+            _simSeed.SetValueWithoutNotify(unchecked((int)config.Seed));
+            _simLatency.SetValueWithoutNotify(config.LatencyMilliseconds);
+            _simJitter.SetValueWithoutNotify(config.JitterMilliseconds);
+            _simLoss.SetValueWithoutNotify(config.LossProbability);
+            _simDuplicate.SetValueWithoutNotify(config.DuplicateProbability);
+            _simReorder.SetValueWithoutNotify(config.ReorderProbability);
+            _simBandwidth.SetValueWithoutNotify(config.BandwidthBytesPerSecond);
+            _simMaxPackets.SetValueWithoutNotify(config.MaxQueuedPackets);
+            _simMaxBytes.SetValueWithoutNotify(config.MaxQueuedBytes);
+            _simDecisionCapacity.SetValueWithoutNotify(config.DecisionCapacity);
+        }
+
+        private void ApplySimulatorConfig()
+        {
+            var control = Control();
+            if (control == null) return;
+            var config = control.CaptureConfig();
+            config.Seed = unchecked((uint)_simSeed.value);
+            config.LatencyMilliseconds = _simLatency.value;
+            config.JitterMilliseconds = _simJitter.value;
+            config.LossProbability = _simLoss.value;
+            config.DuplicateProbability = _simDuplicate.value;
+            config.ReorderProbability = _simReorder.value;
+            config.BandwidthBytesPerSecond = _simBandwidth.value;
+            config.MaxQueuedPackets = _simMaxPackets.value;
+            config.MaxQueuedBytes = _simMaxBytes.value;
+            config.DecisionCapacity = _simDecisionCapacity.value;
+            control.ApplyConfig(in config);
+            RefreshDisplay();
+        }
+
+        private void ToggleSimulatorPause()
+        {
+            var control = Control();
+            if (control == null) return;
+            control.SetPaused(!control.CaptureStats().Paused);
+        }
+
+        private void ToggleSimulatorRecording()
+        {
+            var control = Control();
+            if (control == null) return;
+            if (control.CaptureStats().Recording)
+                _lastRecording = control.StopRecording();
+            else
+                control.StartRecording();
+        }
+
+        private void ReplayLastRecording()
+        {
+            var control = Control();
+            if (control == null || _lastRecording.Count == 0) return;
+            control.StartReplay(_lastRecording);
+        }
+
+        private static void FormatSimulator(NetworkDebugData data, StringBuilder text)
+        {
+            if (!data.HasSimulator)
+            {
+                text.AppendLine("This endpoint does not expose a mock simulator capability.");
+                return;
+            }
+            var stats = data.SimulationStats;
+            text.AppendLine($"Connected: {stats.Connected}; paused: {stats.Paused}; generation: {stats.ConnectionGeneration}");
+            text.AppendLine($"Time: {stats.TimeMilliseconds} ms; cycle: {stats.Cycle}; recording: {stats.Recording}; replaying: {stats.Replaying}; replay errors: {stats.ReplayErrors}");
+            FormatDirection("Client -> Server", stats.ClientToServer, text);
+            FormatDirection("Server -> Client", stats.ServerToClient, text);
+            text.AppendLine();
+            text.AppendLine("Recent decisions:");
+            for (var i = 0; i < data.SimulationDecisions.Count; i++)
+            {
+                var row = data.SimulationDecisions[i];
+                text.AppendLine($"[{i}] t={row.TimeMilliseconds} {row.Direction} #{row.Ordinal} {row.Kind} bytes={row.Bytes} due={row.ScheduledMilliseconds} reorder={row.Reordered} duplicate={row.Duplicated}");
+            }
+        }
+
+        private static void FormatDirection(string label, NetworkSimulationDirectionStats stats,
+            StringBuilder text)
+        {
+            text.AppendLine($"{label}: queued={stats.QueuedPackets}/{stats.QueuedBytes}B scheduled={stats.ScheduledPackets} delivered={stats.DeliveredPackets} lost={stats.LostPackets} overflow={stats.OverflowPackets} duplicates={stats.DuplicatePackets} reordered={stats.ReorderedPackets}");
         }
 
         private static void FormatOverview(NetworkDebugData data, StringBuilder text)

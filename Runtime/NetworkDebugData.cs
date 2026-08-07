@@ -77,7 +77,8 @@ namespace UniGame.StaticEcs.Network.Profiler
             NetworkSessionDiagnostics[] sessions, NetworkSnapshotDiagnostics[] snapshots,
             NetworkTrafficCounter[] traffic, bool hasRole, NetworkRole role, SchemaFingerprint fingerprint,
             uint serverTick, int tickGap, long receivedBytes, long sentBytes, long receivedPackets,
-            long sentPackets, long errors)
+            long sentPackets, long errors, bool hasSimulator, NetworkSimulationConfig simulationConfig,
+            NetworkSimulationStats simulationStats, NetworkSimulationDecision[] simulationDecisions)
         {
             SourceId = sourceId;
             DisplayName = displayName;
@@ -98,6 +99,10 @@ namespace UniGame.StaticEcs.Network.Profiler
             ReceivedPackets = receivedPackets;
             SentPackets = sentPackets;
             Errors = errors;
+            HasSimulator = hasSimulator;
+            SimulationConfig = simulationConfig;
+            SimulationStats = simulationStats;
+            SimulationDecisions = new ReadOnlyCollection<NetworkSimulationDecision>(simulationDecisions);
         }
 
         /// <summary>Gets the stable registry identifier.</summary>
@@ -156,5 +161,17 @@ namespace UniGame.StaticEcs.Network.Profiler
 
         /// <summary>Gets cumulative non-success result rows.</summary>
         public long Errors { get; }
+
+        /// <summary>Gets whether this source exposes a controllable mock network simulator.</summary>
+        public bool HasSimulator { get; }
+
+        /// <summary>Gets the copied active simulator configuration.</summary>
+        public NetworkSimulationConfig SimulationConfig { get; }
+
+        /// <summary>Gets the copied simulator counters and connection state.</summary>
+        public NetworkSimulationStats SimulationStats { get; }
+
+        /// <summary>Gets copied bounded payload-free simulator decisions.</summary>
+        public IReadOnlyList<NetworkSimulationDecision> SimulationDecisions { get; }
     }
 }

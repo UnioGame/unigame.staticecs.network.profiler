@@ -5,6 +5,8 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
     using UniGame.StaticEcs.Network.Profiler.Editor;
     using UnityEditor;
     using UnityEngine;
+    using UnityEngine.Rendering;
+    using UnityEngine.TestTools;
     using UnityEngine.UIElements;
 
     /// <summary>Verifies the authored Network Debug UI Toolkit layout.</summary>
@@ -48,22 +50,49 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(root.Q<Button>("refresh-button"), Is.Not.Null);
             Assert.That(root.Q<Button>("close-button"), Is.Not.Null);
 
-            var tabs = new[] { "Overview", "Sessions", "Snapshots", "Commands", "Traffic", "Schema", "Trace" };
+            var tabs = new[]
+            {
+                "Overview", "Sessions", "Snapshots", "Commands", "Traffic", "Schema", "Trace",
+                "Simulator"
+            };
             for (var i = 0; i < tabs.Length; i++)
                 Assert.That(root.Q<Button>("tab-" + tabs[i]), Is.Not.Null, tabs[i]);
+            Assert.That(root.Q<VisualElement>("simulator-controls"), Is.Not.Null);
+            Assert.That(root.Q<DropdownField>("sim-preset"), Is.Not.Null);
+            Assert.That(root.Q<IntegerField>("sim-max-packets"), Is.Not.Null);
+            Assert.That(root.Q<LongField>("sim-max-bytes"), Is.Not.Null);
+            Assert.That(root.Q<IntegerField>("sim-decision-capacity"), Is.Not.Null);
+            Assert.That(root.Q<Button>("sim-connect"), Is.Not.Null);
+            Assert.That(root.Q<Button>("sim-disconnect"), Is.Not.Null);
+            Assert.That(root.Q<Button>("sim-pause"), Is.Not.Null);
+            Assert.That(root.Q<Button>("sim-reset"), Is.Not.Null);
+            Assert.That(root.Q<Button>("sim-record"), Is.Not.Null);
+            Assert.That(root.Q<Button>("sim-replay"), Is.Not.Null);
         }
 
         /// <summary>Verifies repeated Open calls focus one dockable singleton.</summary>
         [Test]
         public void OpenFocusesSingletonWindow()
         {
-            NetworkDebugWindow.Open();
-            var first = EditorWindow.GetWindow<NetworkDebugWindow>();
-            NetworkDebugWindow.Open();
-            var second = EditorWindow.GetWindow<NetworkDebugWindow>();
-            Assert.That(second, Is.SameAs(first));
-            Assert.That(EditorWindow.focusedWindow, Is.SameAs(first));
-            Assert.That(Resources.FindObjectsOfTypeAll<NetworkDebugWindow>(), Has.Length.EqualTo(1));
+            var ignoreGraphicsLogs = SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null;
+            var previousIgnore = LogAssert.ignoreFailingMessages;
+            if (ignoreGraphicsLogs)
+                LogAssert.ignoreFailingMessages = true;
+            try
+            {
+                NetworkDebugWindow.Open();
+                var first = EditorWindow.GetWindow<NetworkDebugWindow>();
+                NetworkDebugWindow.Open();
+                var second = EditorWindow.GetWindow<NetworkDebugWindow>();
+                Assert.That(second, Is.SameAs(first));
+                if (!ignoreGraphicsLogs)
+                    Assert.That(EditorWindow.focusedWindow, Is.SameAs(first));
+                Assert.That(Resources.FindObjectsOfTypeAll<NetworkDebugWindow>(), Has.Length.EqualTo(1));
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = previousIgnore;
+            }
         }
 
         /// <summary>Verifies the public Editor command uses the game-owned Static ECS menu root.</summary>
@@ -165,6 +194,41 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(window.RenderedText, Does.Contain("Hello: 2 packets, 100 bytes"));
             Assert.That(window.RenderedText, Does.Contain("Send total: 1 packets, 250 bytes"));
             Assert.That(window.RenderedText, Does.Contain("FullSnapshot: 1 packets, 250 bytes"));
+        }
+
+        /// <summary>Verifies the Simulator tab reflects an optional shared capability without touching ECS.</summary>
+        [Test]
+        public void SimulatorTabRendersCapabilityAndDisablesUnsupportedSources()
+        {
+            var config = NetworkSimulationPresets.Create(NetworkSimulationPreset.Local);
+            using var simulator = new NetworkSimulator(new ConnectionId(1), in config);
+            using var clientLease = NetworkDebugRegistry.Register("client", "Client",
+                Array.Empty<NetworkSchemaEntry>(), out _, simulator: simulator);
+            using var serverLease = NetworkDebugRegistry.Register("server", "Embedded Server",
+                Array.Empty<NetworkSchemaEntry>(), out _, simulator: simulator);
+            using var dedicatedLease = NetworkDebugRegistry.Register("z-dedicated", "Server",
+                Array.Empty<NetworkSchemaEntry>(), out _);
+            Assert.That(simulator.Client.TrySend(new byte[] { 1, 2 }), Is.True);
+
+            var window = CreateWindow();
+            window.SelectTabForTests("Simulator");
+            var controls = window.rootVisualElement.Q<VisualElement>("simulator-controls");
+            Assert.That(controls.enabledInHierarchy, Is.True);
+            Assert.That(window.RenderedText, Does.Contain("Connected: True"));
+            Assert.That(window.RenderedText, Does.Contain("Client -> Server: queued=1/2B"));
+            Assert.That(window.rootVisualElement.Q<IntegerField>("sim-latency").value,
+                Is.EqualTo(config.LatencyMilliseconds));
+            Assert.That(window.rootVisualElement.Q<IntegerField>("sim-max-packets").value,
+                Is.EqualTo(config.MaxQueuedPackets));
+            Assert.That(window.rootVisualElement.Q<LongField>("sim-max-bytes").value,
+                Is.EqualTo(config.MaxQueuedBytes));
+
+            var dropdown = window.rootVisualElement.Q<DropdownField>("source-dropdown");
+            window.SelectSourceForTests(2);
+            Assert.That(dropdown.value, Is.EqualTo(dropdown.choices[2]));
+            Assert.That(controls.enabledInHierarchy, Is.False);
+            Assert.That(window.RenderedText,
+                Does.Contain("does not expose a mock simulator capability"));
         }
 
         /// <summary>Verifies persisted source and tab preferences are restored when the window is rebuilt.</summary>

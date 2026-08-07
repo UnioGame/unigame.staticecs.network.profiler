@@ -158,6 +158,35 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
                 Is.EqualTo(50), "Reset must clear overflow decode tombstones.");
         }
 
+        /// <summary>Verifies simulator capability is copied defensively and remains caller-owned.</summary>
+        [Test]
+        public void SimulatorCapabilityIsSharedCopiedAndNotResetByRegistry()
+        {
+            var config = NetworkSimulationPresets.Create(NetworkSimulationPreset.Local);
+            using var simulator = new NetworkSimulator(new ConnectionId(8), in config);
+            using var clientLease = NetworkDebugRegistry.Register("client", "Client",
+                Array.Empty<NetworkSchemaEntry>(), out var client, simulator: simulator);
+            using var serverLease = NetworkDebugRegistry.Register("server", "Embedded Server",
+                Array.Empty<NetworkSchemaEntry>(), out var server, simulator: simulator);
+
+            Assert.That(simulator.Client.TrySend(new byte[] { 1, 2, 3 }), Is.True);
+            var clientData = client.Capture();
+            var serverData = server.Capture();
+            Assert.That(clientData.HasSimulator, Is.True);
+            Assert.That(serverData.HasSimulator, Is.True);
+            Assert.That(client.SimulatorControl, Is.SameAs(server.SimulatorControl));
+            Assert.That(clientData.SimulationStats.ClientToServer.QueuedPackets, Is.EqualTo(1));
+            Assert.That(serverData.SimulationDecisions, Has.Count.EqualTo(1));
+            Assert.Throws<NotSupportedException>(() =>
+                ((IList)clientData.SimulationDecisions)[0] = default(NetworkSimulationDecision));
+
+            NetworkDebugRegistry.Reset();
+            Assert.That(simulator.CaptureStats().ClientToServer.QueuedPackets, Is.EqualTo(1),
+                "Registry reset must not mutate its caller-owned simulator capability.");
+            Assert.That(simulator.Client.TrySend(new byte[] { 4 }), Is.True,
+                "Registry leases must not dispose the simulator.");
+        }
+
         /// <summary>Verifies pending receive deltas are visible under None then move to decoded kind exactly once.</summary>
         [Test]
         public void ReceiveThenDecodeAttributesTransportDeltaWithoutDoubleCounting()
