@@ -445,7 +445,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
             {
                 var row = data.Sessions[i];
                 text.AppendLine($"[{i}] {row.Role} {row.State} connection={row.ConnectionId} peer={row.PeerId} epoch={row.Epoch} scope={row.Scope}");
-                text.AppendLine($"    tick={row.ServerTick} ackSnapshot={row.AcknowledgedSnapshotTick} ackCommand={row.AcknowledgedCommandSequence} sendCommand={row.NextSendCommandSequence} receiveCommand={row.NextReceiveCommandSequence} receivePacket={row.NextReceivePacketSequence} sendPacket={row.NextSendPacketSequence}");
+                text.AppendLine($"    tick={row.ServerTick} ackSnapshot={row.AcknowledgedSnapshotTick} processedCommand={row.ServerProcessedCommandSequence} sendCommand={row.NextSendCommandSequence} receiveCommand={row.NextReceiveCommandSequence} receivePacket={row.NextReceivePacketSequence} sendPacket={row.NextSendPacketSequence}");
             }
         }
 
