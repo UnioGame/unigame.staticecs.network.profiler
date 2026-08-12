@@ -1,6 +1,6 @@
 # Static ECS Network Profiler
 
-Privacy-safe Unity Profiler instrumentation and an Editor-only diagnostics window for Network v2.
+Privacy-safe Unity Profiler instrumentation and shared runtime/Editor diagnostics for Network v4.
 
 ## Capabilities
 
@@ -8,8 +8,8 @@ Privacy-safe Unity Profiler instrumentation and an Editor-only diagnostics windo
 - Reports measured nanosecond phase duration as marker metadata and dedicated duration counters.
 - Reports process-wide traffic, outcome deltas, connection state, snapshot, history, and tick-gap gauges.
 - Publishes bounded immutable debug snapshots through `NetworkDebugRegistry` and `NetworkDebugSource`.
-- Provides a dockable UI Toolkit window for overview, session, snapshot, command, traffic,
-  schema, trace, and optional mock-simulator inspection/control.
+- Provides shared `NetworkDebugPage` and `NetworkDebugTextFormatter` contracts for runtime and Editor interfaces.
+- Provides a dockable UI Toolkit window for overview, session, snapshot, command, traffic, schema, trace, and optional mock-simulator inspection/control.
 - Keeps payload bytes, command values, ECS handles, entity data, and user identifiers out of diagnostics.
 
 ## Usage
@@ -45,13 +45,16 @@ flowchart LR
     P --> U["Unity Profiler markers and counters"]
     C --> D["NetworkDebugSource"]
     D --> R["NetworkDebugRegistry"]
-    R --> W["UI Toolkit Network Debug Window"]
+    R --> F["Shared text formatter"]
+    F --> W["Dockable Editor window"]
+    F --> G["Runtime GAME_DEBUG panel"]
     S["Optional INetworkSimulatorControl"] --> D
     D --> N["Bounded opt-in NDJSON trace"]
 ```
 
 Keep the returned lease with the endpoint lifetime and dispose it during shutdown. Open
-`Game > Static ECS > Network Debug` to inspect registered sources. Live pause stops display
+`Game > Static ECS > Network Debug` to inspect registered sources in the Editor. Host and
+Debug Client builds expose the same sources through the shared runtime panel. Live pause stops display
 refresh only; endpoint diagnostics continue. Trace collection can be disabled or cleared,
 and retained trace rows can be exported as strict payload-free NDJSON.
 
@@ -69,7 +72,7 @@ The observer stream, clocks, and endpoint flow are documented in the cross-packa
 
 - Required: reference `unigame.staticecs.network.profiler` from the endpoint assembly.
 - Required for Unity Profiler telemetry: pass a `ProfilerObserver` to each endpoint whose trace stream should be sampled.
-- Required for the Debug Window: register a unique stable source id and dispose its lease during endpoint shutdown.
+- Required for either diagnostics UI: register a unique stable source id and dispose its lease during endpoint shutdown.
 - Optional: configure per-source trace and history capacities; defaults are 512 trace rows and 128 session/snapshot rows. Trace retention is opt-in and starts disabled.
 - Optional: supply a bounded world display name at registration; it is metadata only and never retains a world or ECS handle.
 - Optional: supply a caller-owned `INetworkSimulatorControl`. `NetworkDebugData` copies its
@@ -81,8 +84,7 @@ The observer stream, clocks, and endpoint flow are documented in the cross-packa
 
 ## Limitations
 
-- The Debug Window is Editor-only. It cannot mutate ECS entities or session internals; it
-  may control only an explicitly registered mock simulator capability.
+- Runtime and Editor interfaces cannot mutate ECS entities or session internals; they may control only an explicitly registered mock simulator capability. Trace file export remains Editor-only.
 - Trace and history are process-local bounded diagnostics, not a persistent capture service.
 - Detailed records intentionally omit payload bytes, command values, ECS handles, and Unity object references.
 - Receive-to-Decode attribution assumes the endpoint's synchronous ordered pipeline; asynchronous decode requires correlation metadata.
