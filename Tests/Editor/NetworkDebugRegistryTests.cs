@@ -13,6 +13,9 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
     /// <summary>Verifies bounded, lifetime-safe network diagnostics publication.</summary>
     public sealed class NetworkDebugRegistryTests
     {
+        private static readonly NetworkBufferPool Buffers =
+            new NetworkBufferPool(NetworkBufferPool.DefaultClientRetainedBytes);
+
         /// <summary>Clears the process-wide registry before each test.</summary>
         [SetUp]
         public void SetUp() => NetworkDebugRegistry.Reset();
@@ -169,7 +172,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             using var serverLease = NetworkDebugRegistry.Register("server", "Embedded Server",
                 Array.Empty<NetworkSchemaEntry>(), out var server, simulator: simulator);
 
-            Assert.That(simulator.Client.TrySend(new byte[] { 1, 2, 3 }), Is.True);
+            Assert.That(simulator.Client.TrySend(Buffers.Copy(new byte[] { 1, 2, 3 })), Is.True);
             var clientData = client.Capture();
             var serverData = server.Capture();
             Assert.That(clientData.HasSimulator, Is.True);
@@ -183,7 +186,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             NetworkDebugRegistry.Reset();
             Assert.That(simulator.CaptureStats().ClientToServer.QueuedPackets, Is.EqualTo(1),
                 "Registry reset must not mutate its caller-owned simulator capability.");
-            Assert.That(simulator.Client.TrySend(new byte[] { 4 }), Is.True,
+            Assert.That(simulator.Client.TrySend(Buffers.Copy(new byte[] { 4 })), Is.True,
                 "Registry leases must not dispose the simulator.");
         }
 

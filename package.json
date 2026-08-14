@@ -4,11 +4,11 @@
   "displayName": "Static ECS Network Profiler",
   "description": "Unity Profiler instrumentation and runtime or Editor diagnostics for Static ECS network telemetry",
   "unity": "2023.2",
-  "version": "2026.5.0",
+  "version": "2026.6.0",
   "license": "MIT",
   "keywords": ["unigame", "ecs", "network", "profiler"],
   "dependencies": {
-    "com.unigame.staticecs.network": "2026.5.0",
+    "com.unigame.staticecs.network": "2026.6.0",
     "com.unity.profiling.core": "1.0.3"
   }
 }

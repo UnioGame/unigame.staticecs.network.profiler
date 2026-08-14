@@ -66,7 +66,7 @@ has no simulator capability and its controls remain disabled. Registry reset and
 leases never reset or dispose the caller-owned simulator.
 
 The observer stream, clocks, and endpoint flow are documented in the cross-package
-[network architecture guide](../../../docs/guides/static-ecs-network.md).
+[network architecture guide](../../../docs/guides/network-static-ecs.md).
 
 ## Configuration
 

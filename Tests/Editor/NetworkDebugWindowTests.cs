@@ -13,6 +13,8 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
     public sealed class NetworkDebugWindowTests
     {
         private const string PreferencePrefix = "com.unigame.staticecs.network.profiler.NetworkDebugWindow.";
+        private static readonly NetworkBufferPool Buffers =
+            new NetworkBufferPool(NetworkBufferPool.DefaultClientRetainedBytes);
 
         /// <summary>Resets process and preference state before each behavioral test.</summary>
         [SetUp]
@@ -208,7 +210,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
                 Array.Empty<NetworkSchemaEntry>(), out _, simulator: simulator);
             using var dedicatedLease = NetworkDebugRegistry.Register("z-dedicated", "Server",
                 Array.Empty<NetworkSchemaEntry>(), out _);
-            Assert.That(simulator.Client.TrySend(new byte[] { 1, 2 }), Is.True);
+            Assert.That(simulator.Client.TrySend(Buffers.Copy(new byte[] { 1, 2 })), Is.True);
 
             var window = CreateWindow();
             window.SelectTabForTests("Simulator");
