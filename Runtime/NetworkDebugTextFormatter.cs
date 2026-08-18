@@ -36,6 +36,9 @@ namespace UniGame.StaticEcs.Network.Profiler
                 case NetworkDebugPage.Simulator:
                     FormatSimulator(data, text);
                     break;
+                case NetworkDebugPage.Transport:
+                    FormatTransport(data, text);
+                    break;
                 default:
                     FormatTrace(data, text, commandsOnly: false);
                     break;
@@ -157,6 +160,27 @@ namespace UniGame.StaticEcs.Network.Profiler
                 text.AppendLine($"[{i}] t={row.TimeMilliseconds} {row.Direction} #{row.Ordinal} {row.Kind} bytes={row.Bytes} due={row.ScheduledMilliseconds} reorder={row.Reordered} duplicate={row.Duplicated}");
             }
         }
+
+        private static void FormatTransport(NetworkDebugData data, StringBuilder text)
+        {
+            if (!data.HasTransport || !data.Transport.Available)
+            {
+                text.AppendLine("Transport diagnostics unavailable.");
+                return;
+            }
+
+            var transport = data.Transport;
+            text.AppendLine($"Driver: {Display(transport.Driver)}");
+            text.AppendLine($"Endpoint: {Display(transport.Endpoint)}");
+            text.AppendLine($"State: {Display(transport.State)}");
+            text.AppendLine($"Reliable: receive={transport.ReliableReceivedPackets} packets/{transport.ReliableReceivedBytes} bytes; send={transport.ReliableSentPackets} packets/{transport.ReliableSentBytes} bytes");
+            text.AppendLine($"Unreliable: receive={transport.UnreliableReceivedPackets} packets/{transport.UnreliableReceivedBytes} bytes; send={transport.UnreliableSentPackets} packets/{transport.UnreliableSentBytes} bytes");
+            text.AppendLine($"Queues: {transport.QueuedPackets} packets; outstanding leases={transport.OutstandingLeases}");
+            text.AppendLine($"Failures: receive overflow={transport.ReceiveQueueOverflows}; malformed={transport.MalformedPackets}; send={transport.SendFailures}; dropped={transport.DroppedPackets}");
+            text.AppendLine($"Lifecycle: disconnects={transport.Disconnects}; reconnect attempts={transport.ReconnectAttempts}; backoff={transport.ReconnectBackoffSeconds:0.###} s");
+        }
+
+        private static string Display(string value) => string.IsNullOrEmpty(value) ? "(not supplied)" : value;
 
         private static void FormatDirection(string label, NetworkSimulationDirectionStats stats,
             StringBuilder text)

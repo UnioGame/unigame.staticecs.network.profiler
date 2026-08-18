@@ -190,6 +190,50 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
                 "Registry leases must not dispose the simulator.");
         }
 
+        /// <summary>Verifies the transport provider is lazy and its readonly snapshot is copied into Capture.</summary>
+        [Test]
+        public void TransportProviderIsLazyAndPublishedAsImmutableSnapshot()
+        {
+            var calls = 0;
+            var value = new NetworkTransportDebugData(true, "UTP", "127.0.0.1:7777", "Connected",
+                2, 200, 3, 300, 4, 400, 5, 500, 6, 7, 8, 9, 10, 11, 12, 13, 1.25);
+            var source = new NetworkDebugSource("source", "Source", Array.Empty<NetworkSchemaEntry>(),
+                transport: () =>
+                {
+                    calls++;
+                    return value;
+                });
+            using var lease = NetworkDebugRegistry.Register(source);
+
+            Assert.That(calls, Is.Zero);
+            var data = source.Capture();
+            Assert.That(calls, Is.EqualTo(1));
+            Assert.That(data.HasTransport, Is.True);
+            Assert.That(data.Transport.Driver, Is.EqualTo("UTP"));
+            Assert.That(data.Transport.ReliableReceivedBytes, Is.EqualTo(200));
+            Assert.That(data.Transport.UnreliableSentPackets, Is.EqualTo(5));
+            Assert.That(data.Transport.ReconnectBackoffSeconds, Is.EqualTo(1.25));
+        }
+
+        /// <summary>Verifies a missing or throwing transport provider never escapes Capture.</summary>
+        [Test]
+        public void MissingAndThrowingTransportProvidersAreUnavailable()
+        {
+            using var missing = NetworkDebugRegistry.Register("missing", "Missing",
+                Array.Empty<NetworkSchemaEntry>(), out var missingSource);
+            var missingData = missingSource.Capture();
+            Assert.That(missingData.HasTransport, Is.False);
+            Assert.That(missingData.Transport.Available, Is.False);
+
+            var throwing = new NetworkDebugSource("throwing", "Throwing", Array.Empty<NetworkSchemaEntry>(),
+                transport: () => throw new InvalidOperationException("world destroyed"));
+            using var throwingLease = NetworkDebugRegistry.Register(throwing);
+            Assert.DoesNotThrow(() => throwing.Capture());
+            var throwingData = throwing.Capture();
+            Assert.That(throwingData.HasTransport, Is.False);
+            Assert.That(throwingData.Transport.Available, Is.False);
+        }
+
         /// <summary>Verifies pending receive deltas are visible under None then move to decoded kind exactly once.</summary>
         [Test]
         public void ReceiveThenDecodeAttributesTransportDeltaWithoutDoubleCounting()

@@ -25,6 +25,9 @@ namespace UniGame.StaticEcs.Network.Profiler
         Trace,
 
         /// <summary>Displays mock simulator state and decisions.</summary>
-        Simulator
+        Simulator,
+
+        /// <summary>Displays Unity Transport state and channel counters.</summary>
+        Transport
     }
 }

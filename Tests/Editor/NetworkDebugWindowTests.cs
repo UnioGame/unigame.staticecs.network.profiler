@@ -55,7 +55,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             var tabs = new[]
             {
                 "Overview", "Sessions", "Snapshots", "Commands", "Traffic", "Schema", "Trace",
-                "Simulator"
+                "Simulator", "Transport"
             };
             for (var i = 0; i < tabs.Length; i++)
                 Assert.That(root.Q<Button>("tab-" + tabs[i]), Is.Not.Null, tabs[i]);

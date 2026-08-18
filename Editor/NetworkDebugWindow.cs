@@ -19,7 +19,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Editor
 
         private static readonly string[] Tabs =
         {
-            "Overview", "Sessions", "Snapshots", "Commands", "Traffic", "Schema", "Trace", "Simulator"
+            "Overview", "Sessions", "Snapshots", "Commands", "Traffic", "Schema", "Trace", "Simulator", "Transport"
         };
 
         private readonly List<NetworkDebugSource> _sources = new List<NetworkDebugSource>();

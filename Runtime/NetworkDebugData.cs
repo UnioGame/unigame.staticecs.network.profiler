@@ -78,7 +78,8 @@ namespace UniGame.StaticEcs.Network.Profiler
             NetworkTrafficCounter[] traffic, bool hasRole, NetworkRole role, SchemaFingerprint fingerprint,
             uint serverTick, int tickGap, long receivedBytes, long sentBytes, long receivedPackets,
             long sentPackets, long errors, bool hasSimulator, NetworkSimulationConfig simulationConfig,
-            NetworkSimulationStats simulationStats, NetworkSimulationDecision[] simulationDecisions)
+            NetworkSimulationStats simulationStats, NetworkSimulationDecision[] simulationDecisions,
+            bool hasTransport, NetworkTransportDebugData transport)
         {
             SourceId = sourceId;
             DisplayName = displayName;
@@ -103,6 +104,8 @@ namespace UniGame.StaticEcs.Network.Profiler
             SimulationConfig = simulationConfig;
             SimulationStats = simulationStats;
             SimulationDecisions = new ReadOnlyCollection<NetworkSimulationDecision>(simulationDecisions);
+            HasTransport = hasTransport;
+            Transport = transport;
         }
 
         /// <summary>Gets the stable registry identifier.</summary>
@@ -173,5 +176,11 @@ namespace UniGame.StaticEcs.Network.Profiler
 
         /// <summary>Gets copied bounded payload-free simulator decisions.</summary>
         public IReadOnlyList<NetworkSimulationDecision> SimulationDecisions { get; }
+
+        /// <summary>Gets whether a transport diagnostics provider returned an available snapshot.</summary>
+        public bool HasTransport { get; }
+
+        /// <summary>Gets the copied transport diagnostics snapshot, or an unavailable default value.</summary>
+        public NetworkTransportDebugData Transport { get; }
     }
 }

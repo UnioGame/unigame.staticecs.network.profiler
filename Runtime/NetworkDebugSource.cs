@@ -31,11 +31,12 @@ namespace UniGame.StaticEcs.Network.Profiler
         private int _tickGap;
         private bool _traceEnabled;
         private readonly INetworkSimulatorControl _simulator;
+        private readonly Func<NetworkTransportDebugData> _transport;
 
         /// <summary>Creates an unregistered source and defensively copies its schema.</summary>
         public NetworkDebugSource(string sourceId, string displayName, IReadOnlyList<NetworkSchemaEntry> schema,
             int traceCapacity = 512, int historyCapacity = 128, string worldName = "",
-            INetworkSimulatorControl simulator = null)
+            INetworkSimulatorControl simulator = null, Func<NetworkTransportDebugData> transport = null)
         {
             if (string.IsNullOrWhiteSpace(sourceId)) throw new ArgumentException("A source id is required.", nameof(sourceId));
             if (string.IsNullOrWhiteSpace(displayName)) throw new ArgumentException("A display name is required.", nameof(displayName));
@@ -47,6 +48,7 @@ namespace UniGame.StaticEcs.Network.Profiler
             DisplayName = displayName;
             WorldName = NormalizeWorldName(worldName);
             _simulator = simulator;
+            _transport = transport;
             _schema = CopySchema(schema);
             _trace = new RingBuffer<NetworkTraceEvent>(traceCapacity);
             _sessions = new RingBuffer<NetworkSessionDiagnostics>(historyCapacity);
@@ -125,13 +127,14 @@ namespace UniGame.StaticEcs.Network.Profiler
             var simulationDecisions = hasSimulator
                 ? CopyDecisions(_simulator.CaptureDecisions())
                 : Array.Empty<NetworkSimulationDecision>();
+            var transport = CaptureTransport(out var hasTransport);
             lock (_gate)
             {
                 return new NetworkDebugData(SourceId, DisplayName, WorldName, _revision,
                     (NetworkDebugSchemaEntry[])_schema.Clone(), _trace.Copy(), _sessions.Copy(), _snapshots.Copy(),
                     CopyTraffic(), _hasRole, _role, _fingerprint, _serverTick, _tickGap, _receivedBytes,
                     _sentBytes, _receivedPackets, _sentPackets, _errors, hasSimulator,
-                    simulationConfig, simulationStats, simulationDecisions);
+                    simulationConfig, simulationStats, simulationDecisions, hasTransport, transport);
             }
         }
 
@@ -291,6 +294,24 @@ namespace UniGame.StaticEcs.Network.Profiler
             var result = new NetworkSimulationDecision[decisions.Count];
             for (var i = 0; i < decisions.Count; i++) result[i] = decisions[i];
             return result;
+        }
+
+        private NetworkTransportDebugData CaptureTransport(out bool available)
+        {
+            available = false;
+            if (_transport == null)
+                return default;
+
+            try
+            {
+                var value = _transport();
+                available = value.Available;
+                return value;
+            }
+            catch (Exception)
+            {
+                return default;
+            }
         }
 
         private sealed class RingBuffer<T>

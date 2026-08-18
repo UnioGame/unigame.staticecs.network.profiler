@@ -21,6 +21,7 @@
                 <ui:Button name="tab-Schema" text="Schema" class="tab-button" />
                 <ui:Button name="tab-Trace" text="Trace" class="tab-button" />
                 <ui:Button name="tab-Simulator" text="Simulator" class="tab-button" />
+                <ui:Button name="tab-Transport" text="Transport" class="tab-button" />
             </ui:VisualElement>
             <ui:VisualElement name="right-pane" class="right-pane">
                 <ui:Label name="content-title" text="Overview" class="content-title" />

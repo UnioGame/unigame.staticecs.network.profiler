@@ -14,10 +14,11 @@ namespace UniGame.StaticEcs.Network.Profiler
         /// <summary>Creates and registers a source, copying schema rows before publication.</summary>
         public static IDisposable Register(string sourceId, string displayName, IReadOnlyList<NetworkSchemaEntry> schema,
             out NetworkDebugSource source, int traceCapacity = 512, int historyCapacity = 128,
-            string worldName = "", INetworkSimulatorControl simulator = null)
+            string worldName = "", INetworkSimulatorControl simulator = null,
+            Func<NetworkTransportDebugData> transport = null)
         {
             source = new NetworkDebugSource(sourceId, displayName, schema, traceCapacity,
-                historyCapacity, worldName, simulator);
+                historyCapacity, worldName, simulator, transport);
             return Register(source);
         }
 
@@ -25,10 +26,11 @@ namespace UniGame.StaticEcs.Network.Profiler
         public static IDisposable RegisterWithProfiler(string sourceId, string displayName,
             IReadOnlyList<NetworkSchemaEntry> schema, out NetworkProfilerDebugObserver observer,
             uint profilerSource = 0, int traceCapacity = 512, int historyCapacity = 128,
-            string worldName = "", INetworkSimulatorControl simulator = null)
+            string worldName = "", INetworkSimulatorControl simulator = null,
+            Func<NetworkTransportDebugData> transport = null)
         {
             var lease = Register(sourceId, displayName, schema, out var debugSource, traceCapacity,
-                historyCapacity, worldName, simulator);
+                historyCapacity, worldName, simulator, transport);
             observer = new NetworkProfilerDebugObserver(new ProfilerObserver(profilerSource), debugSource);
             return lease;
         }
