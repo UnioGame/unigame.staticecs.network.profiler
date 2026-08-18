@@ -234,6 +234,31 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(throwingData.Transport.Available, Is.False);
         }
 
+        /// <summary>Verifies a provider that becomes invalid after world destruction is captured safely.</summary>
+        [Test]
+        public void TransportProviderBecomingInvalidAfterWorldDestroyIsSafe()
+        {
+            var worldDestroyed = false;
+            var value = new NetworkTransportDebugData(true, "UTP", "127.0.0.1:7777", "Connected",
+                1, 10, 2, 20, 3, 30, 4, 40, 1, 0, 0, 0, 0, 0, 0,
+                reconnectAttempts: 0, reconnectBackoffSeconds: 0);
+            var source = new NetworkDebugSource("lifecycle", "Lifecycle", Array.Empty<NetworkSchemaEntry>(),
+                transport: () =>
+                {
+                    if (worldDestroyed)
+                        throw new InvalidOperationException("world destroyed");
+                    return value;
+                });
+            using var lease = NetworkDebugRegistry.Register(source);
+
+            Assert.That(source.Capture().HasTransport, Is.True);
+            worldDestroyed = true;
+            Assert.DoesNotThrow(() => source.Capture());
+            var afterDestroy = source.Capture();
+            Assert.That(afterDestroy.HasTransport, Is.False);
+            Assert.That(afterDestroy.Transport.Available, Is.False);
+        }
+
         /// <summary>Verifies pending receive deltas are visible under None then move to decoded kind exactly once.</summary>
         [Test]
         public void ReceiveThenDecodeAttributesTransportDeltaWithoutDoubleCounting()

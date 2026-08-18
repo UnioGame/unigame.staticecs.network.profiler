@@ -9,7 +9,6 @@ Privacy-safe Unity Profiler instrumentation and shared runtime/Editor diagnostic
 - Reports process-wide traffic, outcome deltas, connection state, snapshot, history, and tick-gap gauges.
 - Publishes bounded immutable debug snapshots through `NetworkDebugRegistry` and `NetworkDebugSource`.
 - Provides shared `NetworkDebugPage` and `NetworkDebugTextFormatter` contracts for runtime and Editor interfaces.
-- Publishes payload-free `NetworkTransportDebugData` through an optional lazy provider and renders a Transport page.
 - Provides a dockable UI Toolkit window for overview, session, snapshot, command, traffic, schema, trace, and optional mock-simulator inspection/control.
 - Keeps payload bytes, command values, ECS handles, entity data, and user identifiers out of diagnostics.
 
@@ -34,8 +33,7 @@ var lease = NetworkDebugRegistry.RegisterWithProfiler(
     schema.Entries,
     out var diagnostics,
     worldName: typeof(GameWorld).Name,
-    simulator: optionalSimulator,
-    transport: optionalTransportDiagnostics);
+    simulator: optionalSimulator);
 
 var client = new NetworkClient<GameWorld>(transport, schema, scope, diagnostics);
 ```
@@ -79,8 +77,6 @@ The observer stream, clocks, and endpoint flow are documented in the cross-packa
 - Optional: supply a bounded world display name at registration; it is metadata only and never retains a world or ECS handle.
 - Optional: supply a caller-owned `INetworkSimulatorControl`. `NetworkDebugData` copies its
   configuration, counters, and payload-free decision timeline before publishing a snapshot.
-- Optional: supply a lazy `Func<NetworkTransportDebugData>` provider. The provider is evaluated
-  only by `Capture`; missing, throwing, or unavailable providers publish `HasTransport == false`.
 - Optional: assign a privacy-safe numeric profiler `source` lane. Do not derive it from peers, epochs, schema fingerprints, or payload data.
 - Delta counters emit positive totals. Gauge counters retain the latest value and flush at the end of the Unity frame.
 - Receive owns inbound transport totals; the next ordered Decode attributes that retained delta to its validated packet kind. Pending and overflowed rows remain visible under `None`.

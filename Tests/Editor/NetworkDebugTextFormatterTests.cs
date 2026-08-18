@@ -40,7 +40,8 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
         public void TransportPageFormatsDetailedCounters()
         {
             var value = new NetworkTransportDebugData(true, "Unity Transport", "127.0.0.1:7777", "Connected",
-                2, 200, 3, 300, 4, 400, 5, 500, 6, 7, 8, 9, 10, 11, 12, 1.25);
+                2, 200, 3, 300, 4, 400, 5, 500, 6, 7, 8, 9, 10, 11, 12,
+                reconnectAttempts: 13, reconnectBackoffSeconds: 1.25);
             var source = new NetworkDebugSource("transport", "Transport", Array.Empty<NetworkSchemaEntry>(),
                 transport: () => value);
             using var lease = NetworkDebugRegistry.Register(source);
