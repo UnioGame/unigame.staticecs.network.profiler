@@ -15,7 +15,8 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             "SECS.Net.CommandDispatch",
             "SECS.Net.SnapshotApply",
             "SECS.Net.SnapshotCapture",
-            "SECS.Net.Send"
+            "SECS.Net.Send",
+            "SECS.Net.ServerTick"
         };
 
         private static readonly string[] CounterNames =
@@ -26,6 +27,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             "SECS.Net.SnapshotApply.Duration",
             "SECS.Net.SnapshotCapture.Duration",
             "SECS.Net.Send.Duration",
+            "SECS.Net.ServerTick.Duration",
             "SECS.Net.BytesIn",
             "SECS.Net.BytesOut",
             "SECS.Net.PacketsIn",
@@ -42,7 +44,11 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             "SECS.Net.SnapshotRecords",
             "SECS.Net.HistoryTicks",
             "SECS.Net.HistoryBytes",
-            "SECS.Net.ClientServerTickGap"
+            "SECS.Net.ClientServerTickGap",
+            "SECS.Net.Server.QueuedPackets",
+            "SECS.Net.Server.OutstandingLeases",
+            "SECS.Net.Client.QueuedPackets",
+            "SECS.Net.Client.OutstandingLeases"
         };
 
         [Test]
@@ -67,7 +73,8 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
                 "SECS.Net.CommandDispatch.Duration",
                 "SECS.Net.SnapshotApply.Duration",
                 "SECS.Net.SnapshotCapture.Duration",
-                "SECS.Net.Send.Duration"
+                "SECS.Net.Send.Duration",
+                "SECS.Net.ServerTick.Duration"
             });
 
             try
@@ -79,7 +86,8 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
                     NetworkPhase.CommandDispatch,
                     NetworkPhase.SnapshotApply,
                     NetworkPhase.SnapshotCapture,
-                    NetworkPhase.Send
+                    NetworkPhase.Send,
+                    NetworkPhase.ServerTick
                 };
 
                 for (var i = 0; i < phases.Length; i++)
@@ -282,6 +290,44 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
 
             Assert.That(CompletedSamples(marker), Is.EqualTo(1));
             Assert.That(packets.LastValue, Is.EqualTo(1));
+        }
+
+        [UnityTest]
+        public IEnumerator ProjectsTransportQueueAndLeaseGauges()
+        {
+            using var serverQueue = Start("SECS.Net.Server.QueuedPackets");
+            using var serverLeases = Start("SECS.Net.Server.OutstandingLeases");
+            using var clientQueue = Start("SECS.Net.Client.QueuedPackets");
+            using var clientLeases = Start("SECS.Net.Client.OutstandingLeases");
+
+            ProfilerObserver.SampleTransport(NetworkRole.Server, 7, 3);
+            ProfilerObserver.SampleTransport(NetworkRole.Client, 5, 2);
+            yield return null;
+
+            Assert.That(serverQueue.LastValue, Is.EqualTo(7));
+            Assert.That(serverLeases.LastValue, Is.EqualTo(3));
+            Assert.That(clientQueue.LastValue, Is.EqualTo(5));
+            Assert.That(clientLeases.LastValue, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void WarmProjectionDoesNotAllocateManagedMemory()
+        {
+            var observer = new ProfilerObserver(3);
+            var tick = Trace(NetworkPhase.ServerTick, durationNanoseconds: 100);
+            observer.Observe(in tick);
+            ProfilerObserver.SampleTransport(NetworkRole.Server, 1, 2);
+            ProfilerObserver.SampleTransport(NetworkRole.Client, 3, 4);
+
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < 100; i++)
+            {
+                observer.Observe(in tick);
+                ProfilerObserver.SampleTransport(NetworkRole.Server, i, i + 1);
+                ProfilerObserver.SampleTransport(NetworkRole.Client, i + 2, i + 3);
+            }
+
+            Assert.That(GC.GetAllocatedBytesForCurrentThread() - before, Is.Zero);
         }
 
         private static NetworkTraceEvent Trace(

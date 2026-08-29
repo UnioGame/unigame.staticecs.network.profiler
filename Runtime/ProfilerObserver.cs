@@ -15,6 +15,7 @@ namespace UniGame.StaticEcs.Network.Profiler
         private static readonly ProfilerMarker<long, uint, uint> SnapshotApplyMarker = Marker("SECS.Net.SnapshotApply");
         private static readonly ProfilerMarker<long, uint, uint> SnapshotCaptureMarker = Marker("SECS.Net.SnapshotCapture");
         private static readonly ProfilerMarker<long, uint, uint> SendMarker = Marker("SECS.Net.Send");
+        private static readonly ProfilerMarker<long, uint, uint> ServerTickMarker = Marker("SECS.Net.ServerTick");
 
         private static readonly ProfilerCounter<long> ReceiveDurationCounter = Duration("Receive");
         private static readonly ProfilerCounter<long> DecodeDurationCounter = Duration("Decode");
@@ -22,6 +23,7 @@ namespace UniGame.StaticEcs.Network.Profiler
         private static readonly ProfilerCounter<long> SnapshotApplyDurationCounter = Duration("SnapshotApply");
         private static readonly ProfilerCounter<long> SnapshotCaptureDurationCounter = Duration("SnapshotCapture");
         private static readonly ProfilerCounter<long> SendDurationCounter = Duration("Send");
+        private static readonly ProfilerCounter<long> ServerTickDurationCounter = Duration("ServerTick");
 
         private static readonly ProfilerCounter<long> BytesInCounter = Counter<long>("SECS.Net.BytesIn", ProfilerMarkerDataUnit.Bytes);
         private static readonly ProfilerCounter<long> BytesOutCounter = Counter<long>("SECS.Net.BytesOut", ProfilerMarkerDataUnit.Bytes);
@@ -41,6 +43,10 @@ namespace UniGame.StaticEcs.Network.Profiler
         private static ProfilerCounterValue<int> HistoryTicksCounter = Gauge<int>("SECS.Net.HistoryTicks", ProfilerMarkerDataUnit.Count);
         private static ProfilerCounterValue<long> HistoryBytesCounter = Gauge<long>("SECS.Net.HistoryBytes", ProfilerMarkerDataUnit.Bytes);
         private static ProfilerCounterValue<int> ClientServerTickGapCounter = Gauge<int>("SECS.Net.ClientServerTickGap", ProfilerMarkerDataUnit.Count);
+        private static ProfilerCounterValue<int> ServerQueuedPacketsCounter = Gauge<int>("SECS.Net.Server.QueuedPackets", ProfilerMarkerDataUnit.Count);
+        private static ProfilerCounterValue<int> ServerOutstandingLeasesCounter = Gauge<int>("SECS.Net.Server.OutstandingLeases", ProfilerMarkerDataUnit.Count);
+        private static ProfilerCounterValue<int> ClientQueuedPacketsCounter = Gauge<int>("SECS.Net.Client.QueuedPackets", ProfilerMarkerDataUnit.Count);
+        private static ProfilerCounterValue<int> ClientOutstandingLeasesCounter = Gauge<int>("SECS.Net.Client.OutstandingLeases", ProfilerMarkerDataUnit.Count);
 
         /// <summary>Creates an observer for a caller-selected privacy-safe numeric source lane.</summary>
         public ProfilerObserver(uint source = 0)
@@ -50,6 +56,24 @@ namespace UniGame.StaticEcs.Network.Profiler
 
         /// <summary>Gets the caller-selected privacy-safe numeric source lane.</summary>
         public uint Source { get; }
+
+        /// <summary>Samples transport-owned queue and packet-lease gauges after one transport update.</summary>
+        public static void SampleTransport(NetworkRole role, int queuedPackets,
+            int outstandingLeases)
+        {
+            if (role == NetworkRole.Server)
+            {
+                ServerQueuedPacketsCounter.Value = queuedPackets;
+                ServerOutstandingLeasesCounter.Value = outstandingLeases;
+                return;
+            }
+
+            if (role == NetworkRole.Client)
+            {
+                ClientQueuedPacketsCounter.Value = queuedPackets;
+                ClientOutstandingLeasesCounter.Value = outstandingLeases;
+            }
+        }
 
         /// <summary>Projects one immutable network trace event into Unity Profiler telemetry.</summary>
         public void Observe(in NetworkTraceEvent value)
@@ -108,6 +132,7 @@ namespace UniGame.StaticEcs.Network.Profiler
                 case NetworkPhase.SnapshotApply: SnapshotApplyMarker.Begin(value.DurationNanoseconds, value.ServerTick, Source); break;
                 case NetworkPhase.SnapshotCapture: SnapshotCaptureMarker.Begin(value.DurationNanoseconds, value.ServerTick, Source); break;
                 case NetworkPhase.Send: SendMarker.Begin(value.DurationNanoseconds, value.ServerTick, Source); break;
+                case NetworkPhase.ServerTick: ServerTickMarker.Begin(value.DurationNanoseconds, value.ServerTick, Source); break;
             }
         }
 
@@ -121,6 +146,7 @@ namespace UniGame.StaticEcs.Network.Profiler
                 case NetworkPhase.SnapshotApply: SnapshotApplyMarker.End(); break;
                 case NetworkPhase.SnapshotCapture: SnapshotCaptureMarker.End(); break;
                 case NetworkPhase.Send: SendMarker.End(); break;
+                case NetworkPhase.ServerTick: ServerTickMarker.End(); break;
             }
         }
 
@@ -144,6 +170,7 @@ namespace UniGame.StaticEcs.Network.Profiler
                 case NetworkPhase.SnapshotApply: SnapshotApplyDurationCounter.Sample(value.DurationNanoseconds); break;
                 case NetworkPhase.SnapshotCapture: SnapshotCaptureDurationCounter.Sample(value.DurationNanoseconds); break;
                 case NetworkPhase.Send: SendDurationCounter.Sample(value.DurationNanoseconds); break;
+                case NetworkPhase.ServerTick: ServerTickDurationCounter.Sample(value.DurationNanoseconds); break;
             }
         }
 
