@@ -177,7 +177,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             var decoded = Trace(NetworkPhase.Decode, NetworkPacketKind.Hello, 40, 1,
                 NetworkResultCategory.Success, 20, 3);
             source.Observe(in decoded);
-            var sent = Trace(NetworkPhase.Send, NetworkPacketKind.FullSnapshot, 250, 1,
+            var sent = Trace(NetworkPhase.Send, NetworkPacketKind.SnapshotChunk, 250, 1,
                 NetworkResultCategory.Success, 20, 3);
             source.Observe(in sent);
             var error = Trace(NetworkPhase.Decode, NetworkPacketKind.None, 0, 0,
@@ -195,7 +195,7 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(window.RenderedText, Does.Contain("Receive total: 2 packets, 100 bytes"));
             Assert.That(window.RenderedText, Does.Contain("Hello: 2 packets, 100 bytes"));
             Assert.That(window.RenderedText, Does.Contain("Send total: 1 packets, 250 bytes"));
-            Assert.That(window.RenderedText, Does.Contain("FullSnapshot: 1 packets, 250 bytes"));
+            Assert.That(window.RenderedText, Does.Contain("SnapshotChunk: 1 packets, 250 bytes"));
         }
 
         /// <summary>Verifies the Simulator tab reflects an optional shared capability without touching ECS.</summary>

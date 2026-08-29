@@ -274,14 +274,14 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(Traffic(repeatedPending, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes,
                 Is.EqualTo(300), "Capture must not commit or duplicate a pending delta.");
 
-            var decode = TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.FullSnapshot, 120, 9);
+            var decode = TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.SnapshotChunk, 120, 9);
             source.Observe(in decode);
             var decoded = source.Capture();
             Assert.That(decoded.ReceivedBytes, Is.EqualTo(300), "Decode bytes must not increment transport totals.");
             Assert.That(decoded.ReceivedPackets, Is.EqualTo(1));
             Assert.That(Traffic(decoded, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes, Is.Zero);
-            Assert.That(Traffic(decoded, NetworkTrafficDirection.Receive, NetworkPacketKind.FullSnapshot).Bytes, Is.EqualTo(300));
-            Assert.That(Traffic(decoded, NetworkTrafficDirection.Receive, NetworkPacketKind.FullSnapshot).Packets, Is.EqualTo(1));
+            Assert.That(Traffic(decoded, NetworkTrafficDirection.Receive, NetworkPacketKind.SnapshotChunk).Bytes, Is.EqualTo(300));
+            Assert.That(Traffic(decoded, NetworkTrafficDirection.Receive, NetworkPacketKind.SnapshotChunk).Packets, Is.EqualTo(1));
         }
 
         /// <summary>Verifies ordered decodes consume differently sized receives from FIFO oldest-first.</summary>
@@ -294,13 +294,13 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 30, 3));
             Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Hello, 1000, 99));
             Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Ack, 1000, 99));
-            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.FullSnapshot, 1000, 99));
+            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.SnapshotChunk, 1000, 99));
             var data = source.Capture();
             Assert.That(data.ReceivedBytes, Is.EqualTo(60));
             Assert.That(data.ReceivedPackets, Is.EqualTo(6));
             Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.Hello).Bytes, Is.EqualTo(10));
             Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.Ack).Bytes, Is.EqualTo(20));
-            Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.FullSnapshot).Bytes, Is.EqualTo(30));
+            Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.SnapshotChunk).Bytes, Is.EqualTo(30));
         }
 
         /// <summary>Verifies malformed Decode(None) consumes and commits the retained transport delta to None.</summary>
@@ -334,11 +334,11 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(Traffic(tombstoneDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.Hello).Bytes,
                 Is.Zero, "Decode A must consume A's settled-overflow tombstone.");
             Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Ack, 0, 0));
-            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.FullSnapshot, 0, 0));
+            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.SnapshotChunk, 0, 0));
             var allDecoded = source.Capture();
             Assert.That(Traffic(allDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes, Is.EqualTo(10));
             Assert.That(Traffic(allDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.Ack).Bytes, Is.EqualTo(20));
-            Assert.That(Traffic(allDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.FullSnapshot).Bytes,
+            Assert.That(Traffic(allDecoded, NetworkTrafficDirection.Receive, NetworkPacketKind.SnapshotChunk).Bytes,
                 Is.EqualTo(30));
             Assert.That(allDecoded.ReceivedBytes, Is.EqualTo(60));
         }
@@ -354,14 +354,14 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Observe(source, TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 40, 1));
             Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Hello, 1, 1));
             Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Ack, 1, 1));
-            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.FullSnapshot, 1, 1));
+            Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.SnapshotChunk, 1, 1));
             Observe(source, TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Disconnect, 1, 1));
             var data = source.Capture();
             Assert.That(data.ReceivedBytes, Is.EqualTo(100));
             Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.None).Bytes, Is.EqualTo(30));
             Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.Hello).Bytes, Is.Zero);
             Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.Ack).Bytes, Is.Zero);
-            Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.FullSnapshot).Bytes,
+            Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.SnapshotChunk).Bytes,
                 Is.EqualTo(30));
             Assert.That(Traffic(data, NetworkTrafficDirection.Receive, NetworkPacketKind.Disconnect).Bytes,
                 Is.EqualTo(40));
