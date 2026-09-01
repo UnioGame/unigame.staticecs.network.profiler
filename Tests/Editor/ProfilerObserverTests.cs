@@ -16,7 +16,8 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             "SECS.Net.SnapshotApply",
             "SECS.Net.SnapshotCapture",
             "SECS.Net.Send",
-            "SECS.Net.ServerTick"
+            "SECS.Net.ServerTick",
+            "SECS.Net.Resync"
         };
 
         private static readonly string[] CounterNames =
@@ -109,6 +110,21 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
                 DisposeAll(markers);
                 DisposeAll(durations);
             }
+        }
+
+        [UnityTest]
+        public IEnumerator ProjectsCorrelatedRecoveryIntoResyncMarker()
+        {
+            var observer = new ProfilerObserver(7);
+            using var marker = Start("SECS.Net.Resync");
+            var value = Trace(NetworkPhase.Send,
+                packetKind: NetworkPacketKind.ResyncRequest,
+                resyncCorrelationId: 42);
+
+            observer.Observe(in value);
+            yield return null;
+
+            Assert.That(CompletedSamples(marker), Is.EqualTo(1));
         }
 
         [UnityTest]
@@ -348,7 +364,8 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             long durationNanoseconds = 0,
             NetworkPacketKind packetKind = NetworkPacketKind.None,
             int rejectedCommands = 0,
-            NetworkRole role = NetworkRole.Server)
+            NetworkRole role = NetworkRole.Server,
+            uint resyncCorrelationId = 0)
         {
             return new NetworkTraceEvent(
                 phase,
@@ -374,7 +391,8 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
                 historyBytes,
                 clientServerTickGap,
                 durationNanoseconds,
-                rejectedCommands: rejectedCommands);
+                rejectedCommands: rejectedCommands,
+                resyncCorrelationId: resyncCorrelationId);
         }
 
         private static void AssertRegistered(string[] names)

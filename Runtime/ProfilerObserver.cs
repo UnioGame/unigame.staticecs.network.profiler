@@ -7,6 +7,7 @@ namespace UniGame.StaticEcs.Network.Profiler
     {
         private const string DurationMetadata = "DurationNs";
         private const string ServerTickMetadata = "ServerTick";
+        private const string CorrelationMetadata = "CorrelationId";
         private const string SourceMetadata = "Source";
 
         private static readonly ProfilerMarker<long, uint, uint> ReceiveMarker = Marker("SECS.Net.Receive");
@@ -16,6 +17,10 @@ namespace UniGame.StaticEcs.Network.Profiler
         private static readonly ProfilerMarker<long, uint, uint> SnapshotCaptureMarker = Marker("SECS.Net.SnapshotCapture");
         private static readonly ProfilerMarker<long, uint, uint> SendMarker = Marker("SECS.Net.Send");
         private static readonly ProfilerMarker<long, uint, uint> ServerTickMarker = Marker("SECS.Net.ServerTick");
+        private static readonly ProfilerMarker<long, uint, uint> ResyncMarker =
+            new ProfilerMarker<long, uint, uint>(ProfilerCategory.Network,
+                "SECS.Net.Resync", CorrelationMetadata, ServerTickMetadata,
+                SourceMetadata);
 
         private static readonly ProfilerCounter<long> ReceiveDurationCounter = Duration("Receive");
         private static readonly ProfilerCounter<long> DecodeDurationCounter = Duration("Decode");
@@ -99,6 +104,12 @@ namespace UniGame.StaticEcs.Network.Profiler
             }
 
             Sample(in value);
+            if (value.ResyncCorrelationId != 0)
+            {
+                ResyncMarker.Begin(value.ResyncCorrelationId,
+                    value.ServerTick, Source);
+                ResyncMarker.End();
+            }
         }
 
         private static ProfilerMarker<long, uint, uint> Marker(string name)

@@ -1,11 +1,11 @@
 # Static ECS Network Profiler
 
 Privacy-safe Unity Profiler instrumentation and bounded runtime/Editor diagnostics for
-Network protocol v5.
+Network protocol v6.
 
 ## Capabilities
 
-- Emits receive, decode, command dispatch, snapshot apply/capture, and send markers and counters.
+- Emits receive, decode, command dispatch, snapshot apply/capture, send, and correlated resync markers and counters.
 - Publishes bounded payload-free debug snapshots through `NetworkDebugRegistry`.
 - Provides shared formatter contracts and a dockable Editor diagnostics window.
 - Exposes optional simulator controls without allowing diagnostics to mutate ECS or session internals.
