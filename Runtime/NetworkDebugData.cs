@@ -6,7 +6,6 @@ namespace UniGame.StaticEcs.Network.Profiler
     /// <summary>Contains a copied, payload-free schema row for diagnostics presentation.</summary>
     public readonly struct NetworkDebugSchemaEntry
     {
-        /// <summary>Creates a copied schema row.</summary>
         public NetworkDebugSchemaEntry(NetworkSchemaKind kind, uint typeId, byte version, uint maxBytes,
             uint maxCount, string typeName)
         {
@@ -18,22 +17,16 @@ namespace UniGame.StaticEcs.Network.Profiler
             TypeName = typeName ?? string.Empty;
         }
 
-        /// <summary>Gets the wire shape.</summary>
         public NetworkSchemaKind Kind { get; }
 
-        /// <summary>Gets the generated wire identifier.</summary>
         public uint TypeId { get; }
 
-        /// <summary>Gets the serialization version.</summary>
         public byte Version { get; }
 
-        /// <summary>Gets the maximum encoded byte count.</summary>
         public uint MaxBytes { get; }
 
-        /// <summary>Gets the maximum collection count.</summary>
         public uint MaxCount { get; }
 
-        /// <summary>Gets the copied runtime type name.</summary>
         public string TypeName { get; }
     }
 
@@ -49,7 +42,6 @@ namespace UniGame.StaticEcs.Network.Profiler
     /// <summary>Contains deterministic cumulative traffic counters for one direction and packet kind.</summary>
     public readonly struct NetworkTrafficCounter
     {
-        /// <summary>Creates one cumulative traffic counter.</summary>
         public NetworkTrafficCounter(NetworkTrafficDirection direction, NetworkPacketKind packetKind,
             long bytes, long packets)
         {
@@ -59,13 +51,9 @@ namespace UniGame.StaticEcs.Network.Profiler
             Packets = packets;
         }
 
-        /// <summary>Gets the traffic direction.</summary>
         public NetworkTrafficDirection Direction { get; }
-        /// <summary>Gets the packet kind.</summary>
         public NetworkPacketKind PacketKind { get; }
-        /// <summary>Gets cumulative bytes.</summary>
         public long Bytes { get; }
-        /// <summary>Gets cumulative packets.</summary>
         public long Packets { get; }
     }
 
@@ -108,10 +96,8 @@ namespace UniGame.StaticEcs.Network.Profiler
             Transport = transport;
         }
 
-        /// <summary>Gets the stable registry identifier.</summary>
         public string SourceId { get; }
 
-        /// <summary>Gets the human-readable source label.</summary>
         public string DisplayName { get; }
 
         /// <summary>Gets bounded caller-provided world display metadata.</summary>
@@ -135,10 +121,8 @@ namespace UniGame.StaticEcs.Network.Profiler
         /// <summary>Gets cumulative traffic rows ordered by direction then packet kind.</summary>
         public IReadOnlyList<NetworkTrafficCounter> Traffic { get; }
 
-        /// <summary>Gets whether an endpoint role has been observed.</summary>
         public bool HasRole { get; }
 
-        /// <summary>Gets the latest observed endpoint role.</summary>
         public NetworkRole Role { get; }
 
         /// <summary>Gets the latest observed schema fingerprint.</summary>

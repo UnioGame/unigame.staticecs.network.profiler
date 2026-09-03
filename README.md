@@ -1,7 +1,7 @@
 # Static ECS Network Profiler
 
 Privacy-safe Unity Profiler instrumentation and bounded runtime/Editor diagnostics for
-Network protocol v6.
+Network protocol v7.
 
 ## Capabilities
 
