@@ -259,6 +259,32 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(afterDestroy.Transport.Available, Is.False);
         }
 
+        /// <summary>Verifies the original public 21-parameter constructor keeps its exact CLR signature.</summary>
+        [Test]
+        public void LegacyConstructorKeepsExactClrSignature()
+        {
+            var expected = new[]
+            {
+                typeof(bool), typeof(string), typeof(string), typeof(string),
+                typeof(long), typeof(long), typeof(long), typeof(long),
+                typeof(long), typeof(long), typeof(long), typeof(long),
+                typeof(int), typeof(int), typeof(long),
+                typeof(long), typeof(long), typeof(long), typeof(long),
+                typeof(long), typeof(double)
+            };
+            var constructor = typeof(NetworkTransportDebugData).GetConstructor(expected);
+            Assert.That(constructor, Is.Not.Null,
+                "The original 21-parameter public constructor must remain available.");
+            var parameters = constructor.GetParameters();
+            Assert.That(parameters, Has.Length.EqualTo(21));
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                Assert.That(parameters[i].ParameterType, Is.EqualTo(expected[i]));
+                Assert.That(parameters[i].IsOptional, Is.False,
+                    "The legacy constructor must not expose optional parameters.");
+            }
+        }
+
         /// <summary>Verifies legacy transport construction leaves optional native diagnostics explicitly unavailable.</summary>
         [Test]
         public void LegacyTransportConstructionDefaultsNativeDiagnosticsToUnavailable()
@@ -282,6 +308,13 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(value.NativePacketPoolCapacity, Is.EqualTo(NetworkTransportDebugData.Unavailable));
             Assert.That(value.NativePacketPoolLowWater, Is.EqualTo(NetworkTransportDebugData.Unavailable));
             Assert.That(value.DeliveryCallbacks, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.NativeSentPackets, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.NativeReceivedPackets, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.NativeSentBytes, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.NativeReceivedBytes, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.NativePacketLoss, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.ReliableReceiveOverflowDisconnects, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.UnreliableReceiveDrops, Is.EqualTo(NetworkTransportDebugData.Unavailable));
         }
 
         /// <summary>Verifies extended transport construction publishes optional native diagnostics.</summary>
@@ -303,7 +336,14 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
                 nativePacketPoolCount: 27,
                 nativePacketPoolCapacity: 28,
                 nativePacketPoolLowWater: 29,
-                deliveryCallbacks: 30);
+                deliveryCallbacks: 30,
+                nativeSentPackets: 31,
+                nativeReceivedPackets: 32,
+                nativeSentBytes: 310,
+                nativeReceivedBytes: 320,
+                nativePacketLoss: 35,
+                reliableReceiveOverflowDisconnects: 33,
+                unreliableReceiveDrops: 34);
 
             Assert.That(value.Driver, Is.EqualTo("LiteNetLib"));
             Assert.That(value.ReliableReceivedPackets, Is.EqualTo(1));
@@ -321,6 +361,13 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(value.NativePacketPoolCapacity, Is.EqualTo(28));
             Assert.That(value.NativePacketPoolLowWater, Is.EqualTo(29));
             Assert.That(value.DeliveryCallbacks, Is.EqualTo(30));
+            Assert.That(value.NativeSentPackets, Is.EqualTo(31));
+            Assert.That(value.NativeReceivedPackets, Is.EqualTo(32));
+            Assert.That(value.NativeSentBytes, Is.EqualTo(310));
+            Assert.That(value.NativeReceivedBytes, Is.EqualTo(320));
+            Assert.That(value.NativePacketLoss, Is.EqualTo(35));
+            Assert.That(value.ReliableReceiveOverflowDisconnects, Is.EqualTo(33));
+            Assert.That(value.UnreliableReceiveDrops, Is.EqualTo(34));
         }
 
         /// <summary>Verifies pending receive deltas are visible under None then move to decoded kind exactly once.</summary>

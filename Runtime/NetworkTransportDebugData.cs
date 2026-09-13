@@ -6,7 +6,48 @@ namespace UniGame.StaticEcs.Network.Profiler
         /// <summary>Value used for optional native diagnostics that the active transport cannot expose.</summary>
         public const int Unavailable = -1;
 
-        /// <summary>Creates one transport diagnostics snapshot.</summary>
+        /// <summary>Creates one transport diagnostics snapshot with the original public signature.</summary>
+        public NetworkTransportDebugData(bool available, string driver, string endpoint, string state,
+            long reliableReceivedPackets, long reliableReceivedBytes,
+            long reliableSentPackets, long reliableSentBytes,
+            long unreliableReceivedPackets, long unreliableReceivedBytes,
+            long unreliableSentPackets, long unreliableSentBytes,
+            int queuedPackets, int outstandingLeases, long receiveQueueOverflows,
+            long sendFailures, long malformedPackets, long droppedPackets, long disconnects,
+            long reconnectAttempts, double reconnectBackoffSeconds)
+            : this(available, driver, endpoint, state,
+                reliableReceivedPackets, reliableReceivedBytes,
+                reliableSentPackets, reliableSentBytes,
+                unreliableReceivedPackets, unreliableReceivedBytes,
+                unreliableSentPackets, unreliableSentBytes,
+                queuedPackets, outstandingLeases, receiveQueueOverflows,
+                sendFailures, malformedPackets, droppedPackets, disconnects,
+                reconnectAttempts, reconnectBackoffSeconds,
+                pendingReliablePackets: Unavailable,
+                pendingReliableBytes: Unavailable,
+                pendingReliablePacketsHighWater: Unavailable,
+                pendingReliableBytesHighWater: Unavailable,
+                reliableSendQueueOverflows: Unavailable,
+                nativeReliableFragments: Unavailable,
+                nativeReliableBytes: Unavailable,
+                nativeReliableFragmentsHighWater: Unavailable,
+                nativeReliableBytesHighWater: Unavailable,
+                nativeReliableQueuePackets: Unavailable,
+                nativePacketPoolCount: Unavailable,
+                nativePacketPoolCapacity: Unavailable,
+                nativePacketPoolLowWater: Unavailable,
+                deliveryCallbacks: Unavailable,
+                nativeSentPackets: Unavailable,
+                nativeReceivedPackets: Unavailable,
+                nativeSentBytes: Unavailable,
+                nativeReceivedBytes: Unavailable,
+                nativePacketLoss: Unavailable,
+                reliableReceiveOverflowDisconnects: Unavailable,
+                unreliableReceiveDrops: Unavailable)
+        {
+        }
+
+        /// <summary>Creates one transport diagnostics snapshot with optional native diagnostics.</summary>
         public NetworkTransportDebugData(bool available, string driver, string endpoint, string state,
             long reliableReceivedPackets, long reliableReceivedBytes,
             long reliableSentPackets, long reliableSentBytes,
@@ -28,7 +69,14 @@ namespace UniGame.StaticEcs.Network.Profiler
             int nativePacketPoolCount = Unavailable,
             int nativePacketPoolCapacity = Unavailable,
             int nativePacketPoolLowWater = Unavailable,
-            long deliveryCallbacks = Unavailable)
+            long deliveryCallbacks = Unavailable,
+            long nativeSentPackets = Unavailable,
+            long nativeReceivedPackets = Unavailable,
+            long nativeSentBytes = Unavailable,
+            long nativeReceivedBytes = Unavailable,
+            long nativePacketLoss = Unavailable,
+            long reliableReceiveOverflowDisconnects = Unavailable,
+            long unreliableReceiveDrops = Unavailable)
         {
             Available = available;
             Driver = driver ?? string.Empty;
@@ -65,6 +113,13 @@ namespace UniGame.StaticEcs.Network.Profiler
             NativePacketPoolCapacity = nativePacketPoolCapacity;
             NativePacketPoolLowWater = nativePacketPoolLowWater;
             DeliveryCallbacks = deliveryCallbacks;
+            NativeSentPackets = nativeSentPackets;
+            NativeReceivedPackets = nativeReceivedPackets;
+            NativeSentBytes = nativeSentBytes;
+            NativeReceivedBytes = nativeReceivedBytes;
+            NativePacketLoss = nativePacketLoss;
+            ReliableReceiveOverflowDisconnects = reliableReceiveOverflowDisconnects;
+            UnreliableReceiveDrops = unreliableReceiveDrops;
         }
 
         /// <summary>Gets whether transport diagnostics are currently available.</summary>
@@ -171,5 +226,26 @@ namespace UniGame.StaticEcs.Network.Profiler
 
         /// <summary>Gets cumulative native delivery callback events, or <see cref="Unavailable"/>.</summary>
         public long DeliveryCallbacks { get; }
+
+        /// <summary>Gets cumulative native packets sent, or <see cref="Unavailable"/>.</summary>
+        public long NativeSentPackets { get; }
+
+        /// <summary>Gets cumulative native packets received, or <see cref="Unavailable"/>.</summary>
+        public long NativeReceivedPackets { get; }
+
+        /// <summary>Gets cumulative native bytes sent, or <see cref="Unavailable"/>.</summary>
+        public long NativeSentBytes { get; }
+
+        /// <summary>Gets cumulative native bytes received, or <see cref="Unavailable"/>.</summary>
+        public long NativeReceivedBytes { get; }
+
+        /// <summary>Gets cumulative native packet loss observed by the transport, or <see cref="Unavailable"/>.</summary>
+        public long NativePacketLoss { get; }
+
+        /// <summary>Gets cumulative reliable receive overflow disconnects, or <see cref="Unavailable"/>.</summary>
+        public long ReliableReceiveOverflowDisconnects { get; }
+
+        /// <summary>Gets cumulative unreliable receive drops, or <see cref="Unavailable"/>.</summary>
+        public long UnreliableReceiveDrops { get; }
     }
 }
