@@ -3,6 +3,9 @@ namespace UniGame.StaticEcs.Network.Profiler
     /// <summary>Contains one immutable, payload-free snapshot of endpoint transport diagnostics.</summary>
     public readonly struct NetworkTransportDebugData
     {
+        /// <summary>Value used for optional native diagnostics that the active transport cannot expose.</summary>
+        public const int Unavailable = -1;
+
         /// <summary>Creates one transport diagnostics snapshot.</summary>
         public NetworkTransportDebugData(bool available, string driver, string endpoint, string state,
             long reliableReceivedPackets, long reliableReceivedBytes,
@@ -11,7 +14,21 @@ namespace UniGame.StaticEcs.Network.Profiler
             long unreliableSentPackets, long unreliableSentBytes,
             int queuedPackets, int outstandingLeases, long receiveQueueOverflows,
             long sendFailures, long malformedPackets, long droppedPackets, long disconnects,
-            long reconnectAttempts, double reconnectBackoffSeconds)
+            long reconnectAttempts, double reconnectBackoffSeconds,
+            int pendingReliablePackets = Unavailable,
+            long pendingReliableBytes = Unavailable,
+            int pendingReliablePacketsHighWater = Unavailable,
+            long pendingReliableBytesHighWater = Unavailable,
+            long reliableSendQueueOverflows = Unavailable,
+            int nativeReliableFragments = Unavailable,
+            long nativeReliableBytes = Unavailable,
+            int nativeReliableFragmentsHighWater = Unavailable,
+            long nativeReliableBytesHighWater = Unavailable,
+            int nativeReliableQueuePackets = Unavailable,
+            int nativePacketPoolCount = Unavailable,
+            int nativePacketPoolCapacity = Unavailable,
+            int nativePacketPoolLowWater = Unavailable,
+            long deliveryCallbacks = Unavailable)
         {
             Available = available;
             Driver = driver ?? string.Empty;
@@ -34,6 +51,20 @@ namespace UniGame.StaticEcs.Network.Profiler
             Disconnects = disconnects;
             ReconnectAttempts = reconnectAttempts;
             ReconnectBackoffSeconds = reconnectBackoffSeconds;
+            PendingReliablePackets = pendingReliablePackets;
+            PendingReliableBytes = pendingReliableBytes;
+            PendingReliablePacketsHighWater = pendingReliablePacketsHighWater;
+            PendingReliableBytesHighWater = pendingReliableBytesHighWater;
+            ReliableSendQueueOverflows = reliableSendQueueOverflows;
+            NativeReliableFragments = nativeReliableFragments;
+            NativeReliableBytes = nativeReliableBytes;
+            NativeReliableFragmentsHighWater = nativeReliableFragmentsHighWater;
+            NativeReliableBytesHighWater = nativeReliableBytesHighWater;
+            NativeReliableQueuePackets = nativeReliableQueuePackets;
+            NativePacketPoolCount = nativePacketPoolCount;
+            NativePacketPoolCapacity = nativePacketPoolCapacity;
+            NativePacketPoolLowWater = nativePacketPoolLowWater;
+            DeliveryCallbacks = deliveryCallbacks;
         }
 
         /// <summary>Gets whether transport diagnostics are currently available.</summary>
@@ -98,5 +129,47 @@ namespace UniGame.StaticEcs.Network.Profiler
 
         /// <summary>Gets the current reconnect backoff in seconds.</summary>
         public double ReconnectBackoffSeconds { get; }
+
+        /// <summary>Gets the current pending reliable packets awaiting native transmission, or <see cref="Unavailable"/>.</summary>
+        public int PendingReliablePackets { get; }
+
+        /// <summary>Gets the current pending reliable bytes awaiting native transmission, or <see cref="Unavailable"/>.</summary>
+        public long PendingReliableBytes { get; }
+
+        /// <summary>Gets the high-water pending reliable packet count observed by the transport, or <see cref="Unavailable"/>.</summary>
+        public int PendingReliablePacketsHighWater { get; }
+
+        /// <summary>Gets the high-water pending reliable byte count observed by the transport, or <see cref="Unavailable"/>.</summary>
+        public long PendingReliableBytesHighWater { get; }
+
+        /// <summary>Gets cumulative reliable send queue overflow events, or <see cref="Unavailable"/>.</summary>
+        public long ReliableSendQueueOverflows { get; }
+
+        /// <summary>Gets the current native reliable fragment count, or <see cref="Unavailable"/>.</summary>
+        public int NativeReliableFragments { get; }
+
+        /// <summary>Gets the current native reliable fragment bytes, or <see cref="Unavailable"/>.</summary>
+        public long NativeReliableBytes { get; }
+
+        /// <summary>Gets the high-water native reliable fragment count observed by the transport, or <see cref="Unavailable"/>.</summary>
+        public int NativeReliableFragmentsHighWater { get; }
+
+        /// <summary>Gets the high-water native reliable fragment bytes observed by the transport, or <see cref="Unavailable"/>.</summary>
+        public long NativeReliableBytesHighWater { get; }
+
+        /// <summary>Gets the current native reliable queue packet count, or <see cref="Unavailable"/>.</summary>
+        public int NativeReliableQueuePackets { get; }
+
+        /// <summary>Gets the current native packet pool count, or <see cref="Unavailable"/>.</summary>
+        public int NativePacketPoolCount { get; }
+
+        /// <summary>Gets the native packet pool capacity, or <see cref="Unavailable"/>.</summary>
+        public int NativePacketPoolCapacity { get; }
+
+        /// <summary>Gets the native packet pool low-water mark, or <see cref="Unavailable"/> when never sampled.</summary>
+        public int NativePacketPoolLowWater { get; }
+
+        /// <summary>Gets cumulative native delivery callback events, or <see cref="Unavailable"/>.</summary>
+        public long DeliveryCallbacks { get; }
     }
 }

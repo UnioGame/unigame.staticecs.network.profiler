@@ -259,6 +259,70 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(afterDestroy.Transport.Available, Is.False);
         }
 
+        /// <summary>Verifies legacy transport construction leaves optional native diagnostics explicitly unavailable.</summary>
+        [Test]
+        public void LegacyTransportConstructionDefaultsNativeDiagnosticsToUnavailable()
+        {
+            var value = new NetworkTransportDebugData(true, "UTP", "127.0.0.1:7777", "Connected",
+                1, 10, 2, 20, 3, 30, 4, 40, 5, 6, 7, 8, 9, 10, 11, 12, 1.25);
+
+            Assert.That(value.Driver, Is.EqualTo("UTP"));
+            Assert.That(value.ReliableReceivedBytes, Is.EqualTo(10));
+            Assert.That(value.PendingReliablePackets, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.PendingReliableBytes, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.PendingReliablePacketsHighWater, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.PendingReliableBytesHighWater, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.ReliableSendQueueOverflows, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.NativeReliableFragments, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.NativeReliableBytes, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.NativeReliableFragmentsHighWater, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.NativeReliableBytesHighWater, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.NativeReliableQueuePackets, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.NativePacketPoolCount, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.NativePacketPoolCapacity, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.NativePacketPoolLowWater, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+            Assert.That(value.DeliveryCallbacks, Is.EqualTo(NetworkTransportDebugData.Unavailable));
+        }
+
+        /// <summary>Verifies extended transport construction publishes optional native diagnostics.</summary>
+        [Test]
+        public void ExtendedTransportConstructionPublishesNativeDiagnostics()
+        {
+            var value = new NetworkTransportDebugData(true, "LiteNetLib", "127.0.0.1:7777", "Connected",
+                1, 10, 2, 20, 3, 30, 4, 40, 5, 6, 7, 8, 9, 10, 11, 12, 1.25,
+                pendingReliablePackets: 21,
+                pendingReliableBytes: 210,
+                pendingReliablePacketsHighWater: 22,
+                pendingReliableBytesHighWater: 220,
+                reliableSendQueueOverflows: 23,
+                nativeReliableFragments: 24,
+                nativeReliableBytes: 240,
+                nativeReliableFragmentsHighWater: 25,
+                nativeReliableBytesHighWater: 250,
+                nativeReliableQueuePackets: 26,
+                nativePacketPoolCount: 27,
+                nativePacketPoolCapacity: 28,
+                nativePacketPoolLowWater: 29,
+                deliveryCallbacks: 30);
+
+            Assert.That(value.Driver, Is.EqualTo("LiteNetLib"));
+            Assert.That(value.ReliableReceivedPackets, Is.EqualTo(1));
+            Assert.That(value.PendingReliablePackets, Is.EqualTo(21));
+            Assert.That(value.PendingReliableBytes, Is.EqualTo(210));
+            Assert.That(value.PendingReliablePacketsHighWater, Is.EqualTo(22));
+            Assert.That(value.PendingReliableBytesHighWater, Is.EqualTo(220));
+            Assert.That(value.ReliableSendQueueOverflows, Is.EqualTo(23));
+            Assert.That(value.NativeReliableFragments, Is.EqualTo(24));
+            Assert.That(value.NativeReliableBytes, Is.EqualTo(240));
+            Assert.That(value.NativeReliableFragmentsHighWater, Is.EqualTo(25));
+            Assert.That(value.NativeReliableBytesHighWater, Is.EqualTo(250));
+            Assert.That(value.NativeReliableQueuePackets, Is.EqualTo(26));
+            Assert.That(value.NativePacketPoolCount, Is.EqualTo(27));
+            Assert.That(value.NativePacketPoolCapacity, Is.EqualTo(28));
+            Assert.That(value.NativePacketPoolLowWater, Is.EqualTo(29));
+            Assert.That(value.DeliveryCallbacks, Is.EqualTo(30));
+        }
+
         /// <summary>Verifies pending receive deltas are visible under None then move to decoded kind exactly once.</summary>
         [Test]
         public void ReceiveThenDecodeAttributesTransportDeltaWithoutDoubleCounting()
