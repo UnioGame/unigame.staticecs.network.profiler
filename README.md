@@ -1,15 +1,33 @@
 # Static ECS Network Profiler
 
-Privacy-safe Unity Profiler instrumentation and bounded runtime/Editor diagnostics for
-Network protocol v7.
+Privacy-safe Unity Profiler instrumentation and bounded diagnostics for network protocol
+v10. It never records payload bytes, command values, ECS handles, entity data or user identifiers.
 
-## Capabilities
+## Data flow
 
-- Emits receive, decode, command dispatch, snapshot apply/capture, send, and correlated resync markers and counters.
-- Publishes bounded payload-free debug snapshots through `NetworkDebugRegistry`.
-- Provides shared formatter contracts and a dockable Editor diagnostics window.
-- Exposes optional simulator controls without allowing diagnostics to mutate ECS or session internals.
-- Omits payload bytes, command values, ECS handles, entity data, and user identifiers.
+```mermaid
+flowchart LR
+    S[NetworkServer / NetworkClient] -- observer --> R[NetworkDebugRegistry]
+    S -- markers --> P[Unity Profiler<br/>SECS.Net.*]
+    R --> W[Editor window<br/>Game ▸ Static ECS ▸ Network Debug]
+    R --> F[Trace export<br/>Editor only]
+```
+
+## Server tick markers
+
+| Marker | Measures |
+|---|---|
+| `SECS.Net.ServerTick` | Whole network tick |
+| `SECS.Net.Command`, `SECS.Net.OwnerLookup` | Command decode, validation and apply |
+| `SECS.Net.Snapshot` | Capture, delta choice and send for all peers |
+| `SECS.Net.SnapshotCapture` | Capture call only (per scope) |
+| `SECS.Net.SnapshotDeltaEncode` | Delta encode on a cache miss |
+| `SECS.Net.PacketPreparation`, `SECS.Net.SnapshotChunkEncode`, `SECS.Net.TransportTrySend` | Per-peer framing and send |
+| `SECS.Net.NativeUpdate`, `SECS.Net.ReceiveCallback` | Transport poll/flush and receive |
+| `SECS.Net.ReliableDrain` | Adapter reliable FIFO drain |
+
+The package also has counters: bytes and packets in and out, active peers, history ticks and
+bytes, resyncs, protocol and schema errors.
 
 ## Usage
 
@@ -18,18 +36,11 @@ using var registration = NetworkDebugRegistry.RegisterWithProfiler(
     "client-main", "Client Main", schema.Entries, out var observer,
     worldName: typeof(ClientWorld).Name);
 
-var client = new NetworkClient<ClientWorld>(
-    transport, schema, scope, observer);
+var client = new NetworkClient<ClientWorld>(transport, schema, scope, observer);
 ```
 
-Keep the registration with endpoint lifetime and dispose it during shutdown. Open
-`Game > Static ECS > Network Debug` to inspect registered sources.
-
-## Configuration
-
-- Required: reference `unigame.staticecs.network.profiler` from the endpoint assembly.
-- Required for telemetry: pass the returned observer to the endpoint.
-- Optional bounded capacities default to 512 trace rows and 128 history rows.
-- Optional simulator control remains caller-owned.
-- Trace retention is opt-in; file export remains Editor-only.
-- See [network architecture](../../../docs/guides/network-static-ecs.md) for package composition.
+- Reference `unigame.staticecs.network.profiler` from the endpoint assembly and pass the
+  returned observer to the endpoint.
+- Keep the registration for the endpoint lifetime and dispose it on shutdown.
+- Default capacities: 512 trace rows, 128 history rows. Trace retention is opt-in.
+- Simulator controls stay caller-owned; diagnostics never mutate ECS or session state.
