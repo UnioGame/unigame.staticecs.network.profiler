@@ -1,5 +1,103 @@
 namespace UniGame.StaticEcs.Network.Profiler
 {
+    /// <summary>Contains explicitly UTP-specific native and stage diagnostics.</summary>
+    public readonly struct UtpNativeDiagnostics
+    {
+        public UtpNativeDiagnostics(bool available,
+            long sentPackets, long receivedPackets, long sentBytes, long receivedBytes,
+            float receiveQueueMeanUsage, float sendQueueMeanUsage,
+            long receiveQueueMaximumUsage, long sendQueueMaximumUsage,
+            long reliableResentPackets, long reliableDroppedPackets,
+            long reliableDuplicatedPackets, long reliableOutOfOrderPackets,
+            long sendQueueFullEvents, long nativeSendErrors,
+            long updateScheduleStopwatchTicks, long updateCompleteStopwatchTicks,
+            long eventPumpStopwatchTicks, long connectionStatisticsStopwatchTicks,
+            long reliableDrainStopwatchTicks, long sendStopwatchTicks,
+            long flushScheduleStopwatchTicks, long flushCompleteStopwatchTicks,
+            long nativeNetworkIdMismatchErrors = 0,
+            long nativeNetworkVersionMismatchErrors = 0,
+            long nativeNetworkStateMismatchErrors = 0,
+            long nativeNetworkPacketOverflowErrors = 0,
+            long nativeNetworkDriverParallelForErrors = 0,
+            long nativeNetworkSendHandleInvalidErrors = 0,
+            long nativeOtherSendErrors = 0,
+            long sendRejectedInvalidConnectionOrHeader = 0,
+            long sendRejectedMalformedPacket = 0,
+            long sendRejectedPayloadLimit = 0,
+            long sendRejectedSnapshotTickOrder = 0)
+        {
+            Available = available;
+            SentPackets = sentPackets;
+            ReceivedPackets = receivedPackets;
+            SentBytes = sentBytes;
+            ReceivedBytes = receivedBytes;
+            ReceiveQueueMeanUsage = receiveQueueMeanUsage;
+            SendQueueMeanUsage = sendQueueMeanUsage;
+            ReceiveQueueMaximumUsage = receiveQueueMaximumUsage;
+            SendQueueMaximumUsage = sendQueueMaximumUsage;
+            ReliableResentPackets = reliableResentPackets;
+            ReliableDroppedPackets = reliableDroppedPackets;
+            ReliableDuplicatedPackets = reliableDuplicatedPackets;
+            ReliableOutOfOrderPackets = reliableOutOfOrderPackets;
+            SendQueueFullEvents = sendQueueFullEvents;
+            NativeSendErrors = nativeSendErrors;
+            UpdateScheduleStopwatchTicks = updateScheduleStopwatchTicks;
+            UpdateCompleteStopwatchTicks = updateCompleteStopwatchTicks;
+            EventPumpStopwatchTicks = eventPumpStopwatchTicks;
+            ConnectionStatisticsStopwatchTicks = connectionStatisticsStopwatchTicks;
+            ReliableDrainStopwatchTicks = reliableDrainStopwatchTicks;
+            SendStopwatchTicks = sendStopwatchTicks;
+            FlushScheduleStopwatchTicks = flushScheduleStopwatchTicks;
+            FlushCompleteStopwatchTicks = flushCompleteStopwatchTicks;
+            NativeNetworkIdMismatchErrors = nativeNetworkIdMismatchErrors;
+            NativeNetworkVersionMismatchErrors = nativeNetworkVersionMismatchErrors;
+            NativeNetworkStateMismatchErrors = nativeNetworkStateMismatchErrors;
+            NativeNetworkPacketOverflowErrors = nativeNetworkPacketOverflowErrors;
+            NativeNetworkDriverParallelForErrors = nativeNetworkDriverParallelForErrors;
+            NativeNetworkSendHandleInvalidErrors = nativeNetworkSendHandleInvalidErrors;
+            NativeOtherSendErrors = nativeOtherSendErrors;
+            SendRejectedInvalidConnectionOrHeader = sendRejectedInvalidConnectionOrHeader;
+            SendRejectedMalformedPacket = sendRejectedMalformedPacket;
+            SendRejectedPayloadLimit = sendRejectedPayloadLimit;
+            SendRejectedSnapshotTickOrder = sendRejectedSnapshotTickOrder;
+        }
+
+        public bool Available { get; }
+        public long SentPackets { get; }
+        public long ReceivedPackets { get; }
+        public long SentBytes { get; }
+        public long ReceivedBytes { get; }
+        public float ReceiveQueueMeanUsage { get; }
+        public float SendQueueMeanUsage { get; }
+        public long ReceiveQueueMaximumUsage { get; }
+        public long SendQueueMaximumUsage { get; }
+        public long ReliableResentPackets { get; }
+        public long ReliableDroppedPackets { get; }
+        public long ReliableDuplicatedPackets { get; }
+        public long ReliableOutOfOrderPackets { get; }
+        public long SendQueueFullEvents { get; }
+        public long NativeSendErrors { get; }
+        public long UpdateScheduleStopwatchTicks { get; }
+        public long UpdateCompleteStopwatchTicks { get; }
+        public long EventPumpStopwatchTicks { get; }
+        public long ConnectionStatisticsStopwatchTicks { get; }
+        public long ReliableDrainStopwatchTicks { get; }
+        public long SendStopwatchTicks { get; }
+        public long FlushScheduleStopwatchTicks { get; }
+        public long FlushCompleteStopwatchTicks { get; }
+        public long NativeNetworkIdMismatchErrors { get; }
+        public long NativeNetworkVersionMismatchErrors { get; }
+        public long NativeNetworkStateMismatchErrors { get; }
+        public long NativeNetworkPacketOverflowErrors { get; }
+        public long NativeNetworkDriverParallelForErrors { get; }
+        public long NativeNetworkSendHandleInvalidErrors { get; }
+        public long NativeOtherSendErrors { get; }
+        public long SendRejectedInvalidConnectionOrHeader { get; }
+        public long SendRejectedMalformedPacket { get; }
+        public long SendRejectedPayloadLimit { get; }
+        public long SendRejectedSnapshotTickOrder { get; }
+    }
+
     /// <summary>Contains one immutable, payload-free snapshot of endpoint transport diagnostics.</summary>
     public readonly struct NetworkTransportDebugData
     {
@@ -43,7 +141,9 @@ namespace UniGame.StaticEcs.Network.Profiler
                 nativeReceivedBytes: Unavailable,
                 nativePacketLoss: Unavailable,
                 reliableReceiveOverflowDisconnects: Unavailable,
-                unreliableReceiveDrops: Unavailable)
+                unreliableReceiveDrops: Unavailable,
+                utpNative: default,
+                activeConnections: Unavailable)
         {
         }
 
@@ -76,7 +176,9 @@ namespace UniGame.StaticEcs.Network.Profiler
             long nativeReceivedBytes = Unavailable,
             long nativePacketLoss = Unavailable,
             long reliableReceiveOverflowDisconnects = Unavailable,
-            long unreliableReceiveDrops = Unavailable)
+            long unreliableReceiveDrops = Unavailable,
+            UtpNativeDiagnostics utpNative = default,
+            int activeConnections = Unavailable)
         {
             Available = available;
             Driver = driver ?? string.Empty;
@@ -120,6 +222,8 @@ namespace UniGame.StaticEcs.Network.Profiler
             NativePacketLoss = nativePacketLoss;
             ReliableReceiveOverflowDisconnects = reliableReceiveOverflowDisconnects;
             UnreliableReceiveDrops = unreliableReceiveDrops;
+            UtpNative = utpNative;
+            ActiveConnections = activeConnections;
         }
 
         /// <summary>Gets whether transport diagnostics are currently available.</summary>
@@ -247,5 +351,11 @@ namespace UniGame.StaticEcs.Network.Profiler
 
         /// <summary>Gets cumulative unreliable receive drops, or <see cref="Unavailable"/>.</summary>
         public long UnreliableReceiveDrops { get; }
+
+        /// <summary>Gets UTP-only driver, reliable-pipeline, queue, and stage diagnostics.</summary>
+        public UtpNativeDiagnostics UtpNative { get; }
+
+        /// <summary>Gets the active transport connection count, or <see cref="Unavailable"/>.</summary>
+        public int ActiveConnections { get; }
     }
 }
