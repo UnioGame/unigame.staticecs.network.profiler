@@ -24,7 +24,11 @@ namespace UniGame.StaticEcs.Network.Profiler
             long sendRejectedInvalidConnectionOrHeader = 0,
             long sendRejectedMalformedPacket = 0,
             long sendRejectedPayloadLimit = 0,
-            long sendRejectedSnapshotTickOrder = 0)
+            long sendRejectedSnapshotTickOrder = 0,
+            long beginSendQueueFullEvents = 0,
+            long endSendQueueFullEvents = 0,
+            long beginSendErrors = 0,
+            long endSendErrors = 0, long reliableDrainQueueFullRetriesSuppressed = 0)
         {
             Available = available;
             SentPackets = sentPackets;
@@ -60,6 +64,11 @@ namespace UniGame.StaticEcs.Network.Profiler
             SendRejectedMalformedPacket = sendRejectedMalformedPacket;
             SendRejectedPayloadLimit = sendRejectedPayloadLimit;
             SendRejectedSnapshotTickOrder = sendRejectedSnapshotTickOrder;
+            BeginSendQueueFullEvents = beginSendQueueFullEvents;
+            EndSendQueueFullEvents = endSendQueueFullEvents;
+            BeginSendErrors = beginSendErrors;
+            EndSendErrors = endSendErrors;
+            ReliableDrainQueueFullRetriesSuppressed = reliableDrainQueueFullRetriesSuppressed;
         }
 
         public bool Available { get; }
@@ -96,6 +105,11 @@ namespace UniGame.StaticEcs.Network.Profiler
         public long SendRejectedMalformedPacket { get; }
         public long SendRejectedPayloadLimit { get; }
         public long SendRejectedSnapshotTickOrder { get; }
+        public long BeginSendQueueFullEvents { get; }
+        public long EndSendQueueFullEvents { get; }
+        public long BeginSendErrors { get; }
+        public long EndSendErrors { get; }
+        public long ReliableDrainQueueFullRetriesSuppressed { get; }
     }
 
     /// <summary>Contains one immutable, payload-free snapshot of endpoint transport diagnostics.</summary>
