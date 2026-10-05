@@ -108,6 +108,68 @@ namespace UniGame.StaticEcs.Network.Profiler.Tests
             Assert.That(recorder.Count, Is.GreaterThanOrEqualTo(1));
         }
 
+        [UnityTest]
+        public IEnumerator DisabledProfilerPreservesIndependentRecordersAndDebugCounters()
+        {
+            var previousEnabled = UnityEngine.Profiling.Profiler.enabled;
+            try
+            {
+                UnityEngine.Profiling.Profiler.enabled = false;
+                using var lease = NetworkDebugRegistry.RegisterWithProfiler("source", "Source",
+                    Array.Empty<NetworkSchemaEntry>(), out var observer);
+                var options = ProfilerRecorderOptions.StartImmediately |
+                    ProfilerRecorderOptions.WrapAroundWhenCapacityReached |
+                    ProfilerRecorderOptions.SumAllSamplesInFrame;
+                using var receivedBytes = ProfilerRecorder.StartNew(ProfilerCategory.Network,
+                    "SECS.Net.BytesIn", 4, options);
+                using var receivedPackets = ProfilerRecorder.StartNew(ProfilerCategory.Network,
+                    "SECS.Net.PacketsIn", 4, options);
+                using var protocolErrors = ProfilerRecorder.StartNew(ProfilerCategory.Network,
+                    "SECS.Net.ProtocolErrors", 4, options);
+                using var queuedPackets = ProfilerRecorder.StartNew(ProfilerCategory.Network,
+                    "SECS.Net.Server.QueuedPackets", 4, options);
+                var receive = TrafficTrace(NetworkPhase.Receive, NetworkPacketKind.None, 300, 1);
+                var decode = TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.Ack, 120, 9);
+                var send = TrafficTrace(NetworkPhase.Send, NetworkPacketKind.SnapshotChunk, 200, 1);
+                var error = TrafficTrace(NetworkPhase.Decode, NetworkPacketKind.None, 0, 0,
+                    NetworkResultCategory.Malformed);
+                observer.Observe(in receive);
+                observer.Observe(in decode);
+                observer.Observe(in send);
+                observer.Observe(in error);
+                var session = Session(1);
+                var snapshot = Snapshot(1);
+                observer.ObserveSession(in session);
+                observer.ObserveSnapshot(in snapshot);
+                ProfilerObserver.SampleTransport(NetworkRole.Server, 9, 2);
+
+                yield return null;
+
+                Assert.That(UnityEngine.Profiling.Profiler.enabled, Is.False);
+                Assert.That(receivedBytes.LastValue, Is.EqualTo(300));
+                Assert.That(receivedPackets.LastValue, Is.EqualTo(1));
+                Assert.That(protocolErrors.LastValue, Is.EqualTo(1));
+                Assert.That(queuedPackets.LastValue, Is.EqualTo(9));
+                var data = observer.DebugSource.Capture();
+                Assert.That(data.Trace, Is.Empty);
+                Assert.That(data.ReceivedBytes, Is.EqualTo(300));
+                Assert.That(data.ReceivedPackets, Is.EqualTo(1));
+                Assert.That(data.SentBytes, Is.EqualTo(200));
+                Assert.That(data.SentPackets, Is.EqualTo(1));
+                Assert.That(data.Errors, Is.EqualTo(1));
+                Assert.That(Traffic(data, NetworkTrafficDirection.Receive,
+                    NetworkPacketKind.Ack).Bytes, Is.EqualTo(300));
+                Assert.That(Traffic(data, NetworkTrafficDirection.Send,
+                    NetworkPacketKind.SnapshotChunk).Bytes, Is.EqualTo(200));
+                Assert.That(data.Sessions, Has.Count.EqualTo(1));
+                Assert.That(data.Snapshots, Has.Count.EqualTo(1));
+            }
+            finally
+            {
+                UnityEngine.Profiling.Profiler.enabled = previousEnabled;
+            }
+        }
+
         /// <summary>Verifies trace pause affects collection only and export remains strict payload-free NDJSON.</summary>
         [Test]
         public void TracePauseAndExportArePresentationOnlyAndPayloadFree()
